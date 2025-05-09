@@ -5,15 +5,24 @@ import networkx as nx
 # --- [Data Generation Code - Copied from previous versions] ---
 # 0. Base Fashion MNIST Class Definitions
 fashion_mnist_classes = [
-    {"id": "I1", "name": "T-shirt/top", "category": "Apparel"}, {"id": "I2", "name": "Trouser", "category": "Apparel"},
-    {"id": "I3", "name": "Pullover", "category": "Apparel"}, {"id": "I4", "name": "Dress", "category": "Apparel"},
-    {"id": "I5", "name": "Coat", "category": "Outerwear"}, {"id": "I6", "name": "Sandal", "category": "Footwear"},
-    {"id": "I7", "name": "Shirt", "category": "Apparel"}, {"id": "I8", "name": "Sneaker", "category": "Footwear"},
-    {"id": "I9", "name": "Bag", "category": "Accessory"}, {"id": "I10", "name": "Ankle boot", "category": "Footwear"}
+    {"id": "I1", "name": "T-shirt/top", "category": "Apparel"}, 
+    {"id": "I2", "name": "Trouser", "category": "Apparel"},
+    {"id": "I3", "name": "Pullover", "category": "Apparel"}, 
+    {"id": "I4", "name": "Dress", "category": "Apparel"},
+    {"id": "I5", "name": "Coat", "category": "Outerwear"}, 
+    {"id": "I6", "name": "Sandal", "category": "Footwear"},
+    {"id": "I7", "name": "Shirt", "category": "Apparel"}, 
+    {"id": "I8", "name": "Sneaker", "category": "Footwear"},
+    {"id": "I9", "name": "Bag", "category": "Accessory"}, 
+    {"id": "I10", "name": "Ankle boot", "category": "Footwear"}
 ]
 
-fictional_brands_list = ["Urban Threads", "Classic Co.", "Active Gear", "Glamora", "Evergreen Basics", "SoleMate", "Terra Firma", "CarryAll", "Chic Steps"]
-colors_list = ["Red", "Blue", "Green", "Black", "White", "Grey", "Brown", "Pink", "Yellow", "Purple", "Beige", "Navy", "Olive", "Charcoal", "Cream"]
+fictional_brands_list = ["Urban Threads", "Classic Co.", "Active Gear", "Glamora", "Evergreen Basics", 
+                        "SoleMate", "Terra Firma", "CarryAll", "Chic Steps", "WinterReady", "SummerBreeze",
+                        "Urban Explorer", "Formal Touch", "Kids Corner", "Sporty Life"]
+
+colors_list = ["Red", "Blue", "Green", "Black", "White", "Grey", "Brown", "Pink", "Yellow", 
+              "Purple", "Beige", "Navy", "Olive", "Charcoal", "Cream", "Teal", "Maroon", "Mustard"]
 materials_map = {
     "Apparel": ["Cotton", "Polyester Blend", "Wool", "Silk", "Linen", "Denim", "Knit", "Fleece", "Rayon"],
     "Outerwear": ["Wool Blend", "Down", "Synthetic Shell", "Leather", "Faux Fur"],
@@ -40,7 +49,7 @@ def generate_fictional_products_and_stores():
     product_id_counter = 1
     for fm_class in fashion_mnist_classes:
         base_class_id = fm_class["id"]; base_class_name = fm_class["name"]; category_type = fm_class["category"]
-        num_instances_per_class = random.randint(3, 5) # Products per category
+        num_instances_per_class = random.randint(2, 8) # Products per category
         for _ in range(num_instances_per_class):
             product_template_list = product_name_templates.get(base_class_name, [f"Generic {base_class_name}"])
             specific_name_base = random.choice(product_template_list); chosen_color = random.choice(colors_list)
