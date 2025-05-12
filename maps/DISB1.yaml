@@ -1,0 +1,98 @@
+# ... (previous content of your YAML file) ...
+
+# Semantic Map - Stores from Knowledge Graph
+# Notes on store poses and gotoposes:
+# - 'pose' defines the center of the store's representative volume.
+# - 'size' defines approximate dimensions [size_x, size_y, size_z].
+#   - For stores in vertical (N/S) corridor alcoves (on the West): size_x is depth, size_y is width along corridor.
+#   - For stores off horizontal (E/W) corridors: size_x is width, size_y is depth from corridor.
+# - 'gotopose' is a navigation target for the robot, usually in the corridor facing the store's entrance.
+#   - Yaw for gotopose: 0 (East), 90 (North), 180 (West), -90 (South).
+
+S1: { # Urban Stylez
+  type: 'store',
+  kg_id: "S1",
+  kg_name: "Urban Stylez",
+  kg_category: "Trendy Apparel",
+  pose: [4.5, 4.0, 0, 0],       # Center of store volume in an alcove (west of main N/S corridor)
+  size: [2.0, 3.0, 2.0],       # depth_x=2m, width_y=3m, height_z=2m
+  color: "Magenta",
+  gotopose: [6.5, 4.0, 180]     # In N/S corridor (x~6.5), facing West (180 deg) towards store
+}
+
+S2: { # Classic Comfort
+  type: 'store',
+  kg_id: "S2",
+  kg_name: "Classic Comfort",
+  kg_category: "Classic & Timeless Apparel",
+  pose: [4.5, 0.0, 0, 0],       # Alcove west of N/S corridor
+  size: [2.0, 3.0, 2.0],
+  color: "Beige",
+  gotopose: [6.5, 0.0, 180]     # In N/S corridor, facing West
+}
+
+S3: { # Footwear Palace
+  type: 'store',
+  kg_id: "S3",
+  kg_name: "Footwear Palace",
+  kg_category: "Shoe Store",
+  pose: [3.0, 9.0, 0, 0],       # Deeper alcove (more to the West) in upper N/S corridor
+  size: [4.0, 3.0, 2.0],       # depth_x=4m
+  color: "Brown",
+  gotopose: [5.5, 9.0, 180]     # In N/S corridor (closer to alcove due to depth), facing West
+}
+
+S4: { # Chic Boutique
+  type: 'store',
+  kg_id: "S4",
+  kg_name: "Chic Boutique",
+  kg_category: "High Fashion & Occasionwear",
+  pose: [19.5, -2.5, 0, 0],     # Far right area, south of an E/W passage (passage at y~-0.7)
+  size: [3.0, 3.0, 2.0],       # width_x=3m, depth_y=3m (store from y=-1.0 to y=-4.0)
+  color: "Pink",
+  gotopose: [19.5, -0.7, -90]   # In E/W passage, facing South (-90 deg) towards store
+}
+
+S5: { # Outerwear Essentials
+  type: 'store',
+  kg_id: "S5",
+  kg_name: "Outerwear Essentials",
+  kg_category: "Outerwear Specialty Store",
+  pose: [9.5, 1.0, 0, 0],       # North of main E/W corridor (corridor at y~-0.8)
+  size: [2.5, 3.0, 2.0],       # width_x=2.5m, depth_y=3m (store from y=-0.5 to y=2.5)
+  color: "DarkGreen",
+  gotopose: [9.5, -0.8, 90]     # In E/W corridor, facing North (90 deg) towards store
+}
+
+S6: { # The Bag & Accessory Nook
+  type: 'store',
+  kg_id: "S6",
+  kg_name: "The Bag & Accessory Nook",
+  kg_category: "Bags & Accessories Store",
+  pose: [10.5, -3.0, 0, 0],     # South of main E/W corridor (corridor at y~-1.2)
+  size: [2.0, 3.0, 2.0],       # width_x=2m, depth_y=3m (store from y=-1.5 to y=-4.5)
+  color: "Purple",
+  gotopose: [10.5, -1.2, -90]   # In E/W corridor, facing South (-90 deg) towards store
+}
+
+S7: { # Everyday Apparel
+  type: 'store',
+  kg_id: "S7",
+  kg_name: "Everyday Apparel",
+  kg_category: "Basic & Casual Clothing",
+  pose: [4.5, -4.0, 0, 0],      # Alcove west of N/S corridor, southern part
+  size: [2.0, 3.0, 2.0],
+  color: "LightBlue",
+  gotopose: [6.5, -4.0, 180]    # In N/S corridor, facing West
+}
+
+S8: { # Active & Street
+  type: 'store',
+  kg_id: "S8",
+  kg_name: "Active & Street",
+  kg_category: "Sportswear & Streetwear",
+  pose: [13.5, 1.0, 0, 0],      # North of main E/W corridor
+  size: [2.5, 3.0, 2.0],
+  color: "Orange",
+  gotopose: [13.5, -0.8, 90]    # In E/W corridor, facing North
+}
