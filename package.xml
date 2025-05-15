@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>mall_navigation</name>
+  <version>0.1.0</version>
+  <description>Semantic mall navigation with MarRTino</description>
+  <maintainer email="your_email@example.com">Your Name</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>rospy</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>move_base_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>tf</depend>
+  <depend>actionlib</depend>
+
+  <exec_depend>python-yaml</exec_depend>
+  <exec_depend>python-networkx</exec_depend>
+</package>
