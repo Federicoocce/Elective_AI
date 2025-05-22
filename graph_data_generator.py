@@ -1,6 +1,7 @@
 # graph_data_generator.py
 import random
 import networkx as nx
+import re # For parsing locations
 
 # --- [Data Generation Code - Copied from previous versions] ---
 # 0. Base Fashion MNIST Class Definitions
@@ -43,13 +44,42 @@ product_name_templates = {
 }
 # --- [End of constants for data generation] ---
 
+def parse_location_coordinates(filepath="locations.txt"):
+    """Parses store coordinates from a file."""
+    coordinates = []
+    try:
+        with open(filepath, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'): 
+                    continue
+                
+                cleaned_line = line.replace('(', '').replace(')', '').replace('[', '').replace(']', '')
+                parts = re.split(r"[\s,]+", cleaned_line)
+                parts = [p for p in parts if p] 
+
+                if len(parts) == 2:
+                    try:
+                        x = float(parts[0])
+                        y = float(parts[1])
+                        coordinates.append({"x": x, "y": y})
+                        print(x,y)
+                    except ValueError:
+                        print(f"Warning: Could not parse coordinate numbers in line: {line}")
+                else:
+                    print(f"Warning: Coordinate line has unexpected format after cleaning: {line} -> {parts}")
+    except FileNotFoundError:
+        print(f"Error: Location file '{filepath}' not found. Store coordinates will not be set.")
+    except Exception as e:
+        print(f"Error reading or parsing location file '{filepath}': {e}")
+    return coordinates
 
 def generate_fictional_products_and_stores():
     fictional_products_data = []
     product_id_counter = 1
     for fm_class in fashion_mnist_classes:
         base_class_id = fm_class["id"]; base_class_name = fm_class["name"]; category_type = fm_class["category"]
-        num_instances_per_class = random.randint(2, 8) # Products per category
+        num_instances_per_class = random.randint(2, 8) 
         for _ in range(num_instances_per_class):
             product_template_list = product_name_templates.get(base_class_name, [f"Generic {base_class_name}"])
             specific_name_base = random.choice(product_template_list); chosen_color = random.choice(colors_list)
@@ -61,7 +91,9 @@ def generate_fictional_products_and_stores():
             })
             product_id_counter += 1
 
-    stores_data = [
+    store_locations = parse_location_coordinates() 
+
+    stores_data_template = [
         {"id": "S1", "name": "Urban Stylez", "type": "Trendy Apparel", "location": "Floor 1, Unit 101", "sells_base_classes": ["I1", "I2", "I3", "I4", "I5", "I6", "I7", "I8", "I9", "I10"]},
         {"id": "S2", "name": "Classic Comfort", "type": "Classic & Timeless Apparel", "location": "Floor 1, Unit 102", "sells_base_classes": ["I2", "I3", "I5", "I7"]},
         {"id": "S3", "name": "Footwear Palace", "type": "Shoe Store", "location": "Floor 2, Unit 201", "sells_base_classes": ["I6", "I8", "I10", "I9"]},
@@ -71,17 +103,29 @@ def generate_fictional_products_and_stores():
         {"id": "S7", "name": "Everyday Apparel", "type": "Basic & Casual Clothing", "location": "Floor 1, Unit 104", "sells_base_classes": ["I1", "I2", "I3", "I7"]},
         {"id": "S8", "name": "Active & Street", "type": "Sportswear & Streetwear", "location": "Floor 2, Unit 203", "sells_base_classes": ["I1", "I2", "I3", "I8", "I9"]}
     ]
+    
+    final_stores_data = []
+    for i, store_template in enumerate(stores_data_template):
+        store_entry = store_template.copy() 
+        if i < len(store_locations):
+            store_entry["pos_x"] = store_locations[i]["x"]
+            store_entry["pos_y"] = store_locations[i]["y"]
+        else:
+            store_entry["pos_x"] = None 
+            store_entry["pos_y"] = None
+            print(f"Warning: No map coordinates found for store {store_template['name']}. Navigation will not be possible.")
+        final_stores_data.append(store_entry)
 
     relationships_data = []
     for product in fictional_products_data:
         product_id = product["product_id"]; base_class_id_of_product = product["base_class_id"]
-        possible_stores = [store for store in stores_data if base_class_id_of_product in store["sells_base_classes"]]
+        possible_stores = [store for store in final_stores_data if base_class_id_of_product in store["sells_base_classes"]]
         if possible_stores:
             num_stores_for_this_product = random.randint(1, min(len(possible_stores), 2))
             selected_stores = random.sample(possible_stores, num_stores_for_this_product)
             for store in selected_stores:
                 relationships_data.append((product_id, "SOLD_IN", store["id"]))
-    return fictional_products_data, stores_data, relationships_data
+    return fictional_products_data, final_stores_data, relationships_data
 
 
 def create_mall_graph():
@@ -96,10 +140,12 @@ def create_mall_graph():
             base_class_id=product['base_class_id'], base_class_name=product['base_class_name'],
             brand=product['brand'], color=product['color'], material=product['material']
         )
-    for store in stores:
+    for store in stores: 
         mall_graph.add_node(
             store['id'], label_node='Store', name=store['name'],
-            type=store['type'], location=store['location']
+            type=store['type'], location=store['location'], 
+            pos_x=store.get('pos_x'), 
+            pos_y=store.get('pos_y')  
         )
     for p_id, rel, s_id in relationships:
         if mall_graph.has_node(p_id) and mall_graph.has_node(s_id):
@@ -109,12 +155,5 @@ def create_mall_graph():
     return mall_graph
 
 if __name__ == '__main__':
-    # This part is just for testing this file independently
     graph = create_mall_graph()
     print("Graph generation test successful.")
-    # Example: print a few nodes
-    # for i, (node_id, data) in enumerate(graph.nodes(data=True)):
-    #     if i < 5:
-    #         print(f"Node: {node_id}, Data: {data}")
-    #     else:
-    #         break
