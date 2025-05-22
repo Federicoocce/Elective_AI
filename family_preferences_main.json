@@ -1,0 +1,41 @@
+{
+  "mother": {
+    "favorite_colors": [],
+    "favorite_brands": [],
+    "preferred_categories": [],
+    "shop_reviews": {},
+    "item_feedback": {}
+  },
+  "father": {
+    "favorite_colors": [],
+    "favorite_brands": [],
+    "preferred_categories": [],
+    "shop_reviews": {},
+    "item_feedback": {}
+  },
+  "child": {
+    "favorite_colors": [],
+    "favorite_brands": [],
+    "preferred_categories": [],
+    "shop_reviews": {
+      "Kids Playworld": {
+        "last_visit_fulfilled": true,
+        "rating": 5,
+        "notes_positive": [
+          "great ambiance",
+          "great service",
+          "great toy"
+        ],
+        "notes_negative": []
+      }
+    },
+    "item_feedback": {
+      "Toy": {
+        "likes": [
+          "great"
+        ],
+        "dislikes": []
+      }
+    }
+  }
+}
