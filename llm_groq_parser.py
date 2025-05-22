@@ -127,10 +127,17 @@ Respond ONLY with valid JSON:"""
         except Exception as e:
             print(f"Groq API or other LLM Error: {str(e)}")
             return {"error": "Groq API Error", "details": str(e)}
+    
 
     def _validate_output_v3(self, output_json):
+        def normalize_color(color):
+            return next((c for c in self.valid_colors if c.lower() == color.lower()), color.capitalize())
+
+        def normalize_brand(brand):
+            return self.valid_brands_lower_map.get(brand.lower())
+
         validated = {
-            "intent": output_json.get("intent", "find_product"), # Default intent
+            "intent": "find_product",
             "shopping_for_user": None,
             "attributes": {},
             "item_types": [],
@@ -138,93 +145,71 @@ Respond ONLY with valid JSON:"""
             "updated_profile_for_shopping_user": {}
         }
 
-        valid_intents = ["find_product", "find_store", "update_profile_only", "show_profile", "stop_interaction"]
-        raw_intent = output_json.get('intent')
-        if raw_intent in valid_intents:
-            validated["intent"] = raw_intent
+        intent = output_json.get("intent")
+        if intent in {"find_product", "find_store", "update_profile_only", "show_profile", "stop_interaction"}:
+            validated["intent"] = intent
         else:
-            print(f"Warning: LLM returned invalid intent '{raw_intent}'. Defaulting to 'find_product'.")
-            # validated["intent"] remains default
+            print(f"Warning: LLM returned invalid intent '{intent}'. Defaulting to 'find_product'.")
 
-        raw_shopping_for = output_json.get("shopping_for_user")
-        if isinstance(raw_shopping_for, str):
-            shopping_for_lower = raw_shopping_for.lower()
-            valid_roles = ["mother", "father", "child", "self"]
-            if shopping_for_lower in valid_roles:
-                validated["shopping_for_user"] = shopping_for_lower
+        user = output_json.get("shopping_for_user")
+        if isinstance(user, str) and user.lower() in {"mother", "father", "child", "self"}:
+            validated["shopping_for_user"] = user.lower()
 
-        if isinstance(output_json.get("attributes"), dict):
-            raw_attributes = output_json["attributes"]
-            color_val = raw_attributes.get("color")
-            if isinstance(color_val, str) and color_val.lower() in self.valid_colors_lower:
-                # Find the original casing from self.valid_colors
-                validated["attributes"]["color"] = next((c for c in self.valid_colors if c.lower() == color_val.lower()), color_val.capitalize())
+        attrs = output_json.get("attributes", {})
+        if isinstance(attrs, dict):
+            color = attrs.get("color")
+            brand = attrs.get("brand")
+            if isinstance(color, str) and color.lower() in self.valid_colors_lower:
+                validated["attributes"]["color"] = normalize_color(color)
+            if isinstance(brand, str) and brand.lower() in self.valid_brands_lower_map:
+                validated["attributes"]["brand"] = normalize_brand(brand)
 
-            brand_val = raw_attributes.get("brand")
-            if isinstance(brand_val, str) and brand_val.lower() in self.valid_brands_lower_map:
-                validated["attributes"]["brand"] = self.valid_brands_lower_map[brand_val.lower()]
+        item_types = output_json.get("item_types")
+        if isinstance(item_types, list):
+            validated["item_types"] = [i for i in item_types if isinstance(i, str) and i in self.valid_item_categories]
+        elif isinstance(item_types, str) and item_types in self.valid_item_categories:
+            validated["item_types"] = [item_types]
 
-        raw_item_types = output_json.get("item_types", [])
-        if isinstance(raw_item_types, list):
-             validated["item_types"] = [
-                item_type for item_type in raw_item_types
-                if isinstance(item_type, str) and item_type in self.valid_item_categories
-            ]
-        elif isinstance(raw_item_types, str) and raw_item_types in self.valid_item_categories: # if LLM sends a single string
-            validated["item_types"] = [raw_item_types]
+        store = output_json.get("store_name")
+        if isinstance(store, str):
+            validated["store_name"] = self.store_names_lower_map.get(store.lower())
 
+        profile_update = output_json.get("updated_profile_for_shopping_user")
+        if isinstance(profile_update, dict):
+            validated["updated_profile_for_shopping_user"] = self._extract_profile_updates(profile_update)
 
-        raw_store_name = output_json.get("store_name")
-        if isinstance(raw_store_name, str):
-            matched_store = self.store_names_lower_map.get(raw_store_name.lower())
-            if matched_store:
-                validated["store_name"] = matched_store
-        
-        raw_updated_profile = output_json.get("updated_profile_for_shopping_user")
-        if isinstance(raw_updated_profile, dict):
-            profile_updates_collector = self._extract_profile_updates(raw_updated_profile)
-            if profile_updates_collector:
-                validated["updated_profile_for_shopping_user"] = profile_updates_collector
-        
         return validated
 
-    def _extract_profile_updates(self, raw_profile_dict):
-        collector = {}
-        if "favorite_colors" in raw_profile_dict:
-            colors_data = raw_profile_dict["favorite_colors"]
-            valid_new_colors = []
-            if isinstance(colors_data, list):
-                for color_name in colors_data:
-                    if isinstance(color_name, str) and color_name.lower() in self.valid_colors_lower:
-                        original_case_color = next((c for c in self.valid_colors if c.lower() == color_name.lower()), color_name.capitalize())
-                        valid_new_colors.append(original_case_color)
-            elif isinstance(colors_data, str) and colors_data.lower() in self.valid_colors_lower: # Single string
-                original_case_color = next((c for c in self.valid_colors if c.lower() == colors_data.lower()), colors_data.capitalize())
-                valid_new_colors.append(original_case_color)
-            if valid_new_colors: collector["favorite_colors"] = valid_new_colors
-        
-        if "favorite_brands" in raw_profile_dict:
-            brands_data = raw_profile_dict["favorite_brands"]
-            valid_new_brands = []
-            if isinstance(brands_data, list):
-                for brand_name in brands_data:
-                    if isinstance(brand_name, str) and brand_name.lower() in self.valid_brands_lower_map:
-                        valid_new_brands.append(self.valid_brands_lower_map[brand_name.lower()])
-            elif isinstance(brands_data, str) and brands_data.lower() in self.valid_brands_lower_map: # Single string
-                valid_new_brands.append(self.valid_brands_lower_map[brands_data.lower()])
-            if valid_new_brands: collector["favorite_brands"] = valid_new_brands
 
-        if "preferred_categories" in raw_profile_dict:
-            categories_data = raw_profile_dict["preferred_categories"]
-            valid_new_categories = []
-            if isinstance(categories_data, list):
-                for cat_name_iter in categories_data:
-                    if isinstance(cat_name_iter, str) and cat_name_iter in self.valid_item_categories:
-                        valid_new_categories.append(cat_name_iter)
-            elif isinstance(categories_data, str) and categories_data in self.valid_item_categories: # Single string
-                valid_new_categories.append(categories_data)
-            if valid_new_categories: collector["preferred_categories"] = valid_new_categories
+    def _extract_profile_updates(self, raw_profile_dict):
+        def collect_valid(items, valid_check, transform):
+            if isinstance(items, list):
+                return [transform(i) for i in items if isinstance(i, str) and valid_check(i)]
+            elif isinstance(items, str) and valid_check(items):
+                return [transform(items)]
+            return []
+
+        collector = {}
+
+        colors = raw_profile_dict.get("favorite_colors")
+        valid_colors = collect_valid(colors, lambda c: c.lower() in self.valid_colors_lower,
+                                    lambda c: next((v for v in self.valid_colors if v.lower() == c.lower()), c.capitalize()))
+        if valid_colors:
+            collector["favorite_colors"] = valid_colors
+
+        brands = raw_profile_dict.get("favorite_brands")
+        valid_brands = collect_valid(brands, lambda b: b.lower() in self.valid_brands_lower_map,
+                                    lambda b: self.valid_brands_lower_map[b.lower()])
+        if valid_brands:
+            collector["favorite_brands"] = valid_brands
+
+        categories = raw_profile_dict.get("preferred_categories")
+        valid_cats = collect_valid(categories, lambda c: c in self.valid_item_categories, lambda c: c)
+        if valid_cats:
+            collector["preferred_categories"] = valid_cats
+
         return collector
+
 
     def parse_feedback_to_profile_update(self, feedback_text, shop_name, item_categories_queried=None):
         if not self.client and not os.environ.get("CI_RUN"):
