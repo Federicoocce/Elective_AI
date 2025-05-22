@@ -24,7 +24,7 @@ class SpeechInterface:
 
     def say(self, text_to_say):
         """Simulates the robot speaking."""
-        print(f"🤖 ROBOT SAYS (TTS Mock): {text_to_say}")
+        print(f" ROBOT SAYS (TTS Mock): {text_to_say}")
         # In a real system, this would send `text_to_say` to a TTS engine.
 
     def listen_and_get_text(self):
@@ -34,13 +34,13 @@ class SpeechInterface:
         """
         if self._current_input_idx < len(self._scripted_inputs):
             user_response = self._scripted_inputs[self._current_input_idx]
-            print(f"🗣️ USER SAYS (STT Mock - Scripted): {user_response}")
+            print(f" USER SAYS (STT Mock - Scripted): {user_response}")
             self._current_input_idx += 1
             return user_response
         else:
             # Fallback to manual input if script runs out or was never set
             try:
-                user_response = input("🗣️ USER SAYS (STT Mock - Manual Input): ")
+                user_response = input("USER SAYS (STT Mock - Manual Input): ")
                 return user_response
             except EOFError: # Handle cases where input stream is closed (e.g., piped input)
                  print("SPEECH: EOFError on input, returning 'stop'.")
