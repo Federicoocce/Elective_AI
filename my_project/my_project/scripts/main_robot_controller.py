@@ -19,11 +19,11 @@ from tf2_ros.transform_listener import TransformListener
 
 
 # --- Import Application Modules ---
-from llm_groq_parser import GroqQueryParser
-from speech_interface import SpeechInterface
-from user_manager import UserProfileManager, VALID_USER_KEYS
-from mall_query_engine import KnowledgeGraphService
-from recommendation_engine import RecommenderEngine
+from .llm_groq_parser import GroqQueryParser
+from .speech_interface import SpeechInterface
+from .user_manager import UserProfileManager, VALID_USER_KEYS
+from .mall_query_engine import KnowledgeGraphService
+from .recommendation_engine import RecommenderEngine
 
 # --- Global State (outside class for script compatibility) ---
 current_speaker_role = None 

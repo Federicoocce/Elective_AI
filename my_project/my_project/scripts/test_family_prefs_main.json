@@ -1,0 +1,50 @@
+{
+  "mother": {
+    "favorite_colors": [
+      "Purple",
+      "Silver"
+    ],
+    "favorite_brands": [
+      "Glamora"
+    ],
+    "preferred_categories": [],
+    "shop_reviews": {},
+    "item_feedback": {}
+  },
+  "father": {
+    "favorite_colors": [],
+    "favorite_brands": [],
+    "preferred_categories": [],
+    "shop_reviews": {
+      "Classic Comfort": {
+        "last_visit_fulfilled": true,
+        "rating": 4,
+        "notes_positive": [
+          "Good range of trousers"
+        ],
+        "notes_negative": [
+          "A bit warm inside"
+        ]
+      }
+    },
+    "item_feedback": {
+      "Trouser": {
+        "likes": [
+          "Classic Co. brand"
+        ],
+        "dislikes": []
+      }
+    }
+  },
+  "child": {
+    "favorite_colors": [
+      "Red"
+    ],
+    "favorite_brands": [],
+    "preferred_categories": [
+      "Toy"
+    ],
+    "shop_reviews": {},
+    "item_feedback": {}
+  }
+}
