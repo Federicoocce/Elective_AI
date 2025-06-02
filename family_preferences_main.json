@@ -3,8 +3,23 @@
     "favorite_colors": [],
     "favorite_brands": [],
     "preferred_categories": [],
-    "shop_reviews": {},
-    "item_feedback": {}
+    "shop_reviews": {
+      "Footwear Palace": {
+        "last_visit_fulfilled": false,
+        "rating": 4,
+        "notes_positive": [
+          "nice and bright",
+          "good layout"
+        ],
+        "notes_negative": []
+      }
+    },
+    "item_feedback": {
+      "Sneaker": {
+        "likes": [],
+        "dislikes": []
+      }
+    }
   },
   "father": {
     "favorite_colors": [],
@@ -19,20 +34,19 @@
     "preferred_categories": [],
     "shop_reviews": {
       "Kids Playworld": {
-        "last_visit_fulfilled": true,
-        "rating": 5,
+        "last_visit_fulfilled": false,
+        "rating": 3,
         "notes_positive": [
-          "great ambiance",
-          "good selection of Toy"
+          "staff tried hard to help"
         ],
-        "notes_negative": []
+        "notes_negative": [
+          "a bit small"
+        ]
       }
     },
     "item_feedback": {
       "Toy": {
-        "likes": [
-          "great"
-        ],
+        "likes": [],
         "dislikes": []
       }
     }

@@ -10,9 +10,9 @@ load_dotenv() # Loads variables from .env file into environment
 class GroqQueryParser:
     def __init__(self):
         api_key = os.environ.get("GROQ_API_KEY")
-
-        
-        self.client = Groq(api_key=api_key)
+        self.client = Groq(api_key=api_key) if api_key else None
+        if not self.client and not os.environ.get("CI_RUN"): # Allow CI to run without API key for basic tests
+             print("LLM_WARNING: GROQ_API_KEY not found. LLM calls will be mocked or will fail.")
 
 
         # These lists will be populated by set_knowledge_base_lists
@@ -36,12 +36,42 @@ class GroqQueryParser:
         self.valid_colors_lower = [c.lower() for c in self.valid_colors]
 
 
-    def generate_structured_query(self, user_query, current_speaker_role_if_known=None, shopping_for_user_profile_context=None):
-        if not self.client and not os.environ.get("CI_RUN"): # Check if client is available
-            print("Error: Groq client not initialized. Cannot make API call.")
-            # Return a default/error structure or raise an exception
-            return {"error": "Groq client not initialized"}
+    def _call_groq_api(self, prompt, max_tokens=550):
+        if not self.client:
+            print("LLM_ERROR: Groq client not initialized or API key missing. Cannot make API call.")
+            # In a real scenario, you might want to raise an exception or return a more specific error structure.
+            # For this exercise, returning a mock error JSON.
+            if "parse_fulfillment_status" in prompt: # Crude check for which parser is called
+                return {"fulfilled": None, "error": "Groq client not available"}
+            elif "parse_next_action_decision" in prompt:
+                 return {"intent": "stop_interaction", "new_query_text": None, "error": "Groq client not available"}
+            return {"error": "Groq client not available"}
 
+
+        try:
+            chat_completion = self.client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model="llama-3.1-8b-instant",
+                temperature=0.1,
+                max_tokens=max_tokens,
+                response_format={"type": "json_object"}
+            )
+            raw_output = chat_completion.choices[0].message.content
+            cleaned_output = raw_output.strip()
+            if cleaned_output.startswith("```json"): cleaned_output = cleaned_output[7:]
+            if cleaned_output.endswith("```"): cleaned_output = cleaned_output[:-3]
+            cleaned_output = cleaned_output.strip()
+
+            return json.loads(cleaned_output)
+
+        except json.JSONDecodeError as e:
+            print(f"LLM JSON Decode Error: {e} in output: '{cleaned_output if 'cleaned_output' in locals() else raw_output if 'raw_output' in locals() else 'Unavailable'}'")
+            return {"error": "JSON Decode Error", "details": str(e)}
+        except Exception as e: # Catch Groq API errors or other issues
+            print(f"Groq API or other LLM Error: {str(e)}")
+            return {"error": "Groq API Error", "details": str(e)}
+
+    def generate_structured_query(self, user_query, current_speaker_role_if_known=None, shopping_for_user_profile_context=None):
         user_profile_json_string = json.dumps(shopping_for_user_profile_context if shopping_for_user_profile_context else {})
         
         speaker_info_str = ""
@@ -100,33 +130,10 @@ Output: {{"intent": "stop_interaction"}}
 
 Current Query: "{user_query}"
 Respond ONLY with valid JSON:"""
-
-        try:
-            if not self.client: # Should have been caught earlier, but defensive check
-                raise ConnectionError("Groq client not available to make API call.")
-
-            chat_completion = self.client.chat.completions.create(
-                messages=[{"role": "user", "content": prompt}],
-                model="llama-3.1-8b-instant",
-                temperature=0.1,
-                max_tokens=550,
-                response_format={"type": "json_object"}
-            )
-            raw_output = chat_completion.choices[0].message.content
-            cleaned_output = raw_output.strip()
-            if cleaned_output.startswith("```json"): cleaned_output = cleaned_output[7:]
-            if cleaned_output.endswith("```"): cleaned_output = cleaned_output[:-3]
-            cleaned_output = cleaned_output.strip()
-
-            parsed_json = json.loads(cleaned_output)
-            return self._validate_output_v3(parsed_json)
-
-        except json.JSONDecodeError as e:
-            print(f"LLM JSON Decode Error: {e} in output: '{cleaned_output if 'cleaned_output' in locals() else raw_output if 'raw_output' in locals() else 'Unavailable'}'")
-            return {"error": "JSON Decode Error", "details": str(e)}
-        except Exception as e:
-            print(f"Groq API or other LLM Error: {str(e)}")
-            return {"error": "Groq API Error", "details": str(e)}
+        parsed_json = self._call_groq_api(prompt)
+        if "error" in parsed_json:
+            return parsed_json # Propagate error
+        return self._validate_output_v3(parsed_json)
     
 
     def _validate_output_v3(self, output_json):
@@ -137,13 +144,19 @@ Respond ONLY with valid JSON:"""
             return self.valid_brands_lower_map.get(brand.lower())
 
         validated = {
-            "intent": "find_product",
+            "intent": "find_product", # Default intent
             "shopping_for_user": None,
             "attributes": {},
             "item_types": [],
             "store_name": None,
             "updated_profile_for_shopping_user": {}
         }
+        
+        if not isinstance(output_json, dict): # API call failed or returned non-dict
+            print(f"LLM_VALIDATE_ERROR: LLM output was not a dict: {output_json}")
+            validated["error"] = "Invalid LLM output format"
+            return validated
+
 
         intent = output_json.get("intent")
         if intent in {"find_product", "find_store", "update_profile_only", "show_profile", "stop_interaction"}:
@@ -212,17 +225,13 @@ Respond ONLY with valid JSON:"""
 
 
     def parse_feedback_to_profile_update(self, feedback_text, shop_name, item_categories_queried=None):
-        if not self.client and not os.environ.get("CI_RUN"):
-            print("Error: Groq client not initialized. Cannot parse feedback.")
-            return {"error": "Groq client not initialized"}
-
         item_categories_queried_str = json.dumps(item_categories_queried if item_categories_queried else [])
 
         prompt = f"""
 You are a profile update assistant. The user has just visited '{shop_name}' and provided feedback.
 The user was initially looking for item categories: {item_categories_queried_str}.
 Analyze the feedback to extract:
-1. "request_fulfilled": Whether their primary shopping goal at this shop was fulfilled (true/false/null if unclear from text).
+1. "request_fulfilled": Whether their primary shopping goal at this shop was fulfilled (true/false/null if unclear from text). THIS IS ABOUT THE SPECIFIC ITEM/S THEY WERE LOOKING FOR, NOT GENERAL SATISFACTION.
 2. "rating": A sentiment-based rating for the shop (1-5, where 1 is very negative, 3 neutral, 5 very positive). Infer if not explicit. Default to null if uninferable.
 3. "notes_positive": Specific things liked about the shop itself (e.g., "ambiance", "service", "layout", "good selection of X").
 4. "notes_negative": Specific things disliked about the shop itself (e.g., "bit messy", "couldn't find Y", "poor service").
@@ -260,53 +269,138 @@ Be concise in notes. Empty lists are acceptable.
 
 Output ONLY a single, valid JSON object. No markdown, no explanations.
 """
-        try:
-            if not self.client:
-                raise ConnectionError("Groq client not available to make API call.")
+        parsed_json = self._call_groq_api(prompt, max_tokens=600)
+        # Basic validation for feedback structure could be added here
+        return parsed_json
 
-            chat_completion = self.client.chat.completions.create(
-                messages=[{"role": "user", "content": prompt}],
-                model="llama-3.1-8b-instant",
-                temperature=0.2,
-                max_tokens=600,
-                response_format={"type": "json_object"}
-            )
-            raw_output = chat_completion.choices[0].message.content
-            cleaned_output = raw_output.strip()
-            if cleaned_output.startswith("```json"): cleaned_output = cleaned_output[7:]
-            if cleaned_output.endswith("```"): cleaned_output = cleaned_output[:-3]
-            cleaned_output = cleaned_output.strip()
+    def parse_fulfillment_status(self, user_text, item_description):
+        """
+        Parses user's text to determine if their specific request was fulfilled at the current store.
+        item_description: A short string describing what the user was looking for (e.g., "a red dress", "toys").
+        """
+        prompt = f"""
+You are an assistant determining if a user's specific shopping goal was met at a store.
+The user was looking for: "{item_description}"
+The user was asked a question like: "Were you able to find what you were looking for here regarding your request for {item_description}?"
+User's response: "{user_text}"
 
-            parsed_json = json.loads(cleaned_output)
-            # Basic validation for feedback structure could be added here
+Analyze the response. Respond STRICTLY with VALID JSON.
+The JSON object should have one key: "fulfilled", with a value of true, false, or null (if unclear).
+
+Examples:
+Item: "a red dress"
+User: "Yes, I found a perfect one!"
+Output: {{"fulfilled": true}}
+
+Item: "a blue shirt"
+User: "No, they didn't have my size."
+Output: {{"fulfilled": false}}
+
+Item: "toys"
+User: "It was okay, but not exactly what I wanted."
+Output: {{"fulfilled": false}}
+
+Item: "a specific book"
+User: "I'm not sure yet."
+Output: {{"fulfilled": null}}
+
+User Response: "{user_text}"
+Respond ONLY with valid JSON:
+"""
+        parsed_json = self._call_groq_api(prompt, max_tokens=100)
+        if "error" in parsed_json: # Propagate API error
+             return parsed_json
+        if isinstance(parsed_json, dict) and "fulfilled" in parsed_json and parsed_json["fulfilled"] in [True, False, None]:
             return parsed_json
-        except json.JSONDecodeError as e:
-            print(f"LLM Feedback JSON Decode Error: {e} in output: '{cleaned_output if 'cleaned_output' in locals() else raw_output if 'raw_output' in locals() else 'Unavailable'}'")
-            return {"error": "JSON Decode Error", "details": str(e)}
-        except Exception as e:
-            print(f"Groq API or other LLM Feedback Error: {str(e)}")
-            return {"error": "Groq API Error", "details": str(e)}
+        else:
+            print(f"LLM_VALIDATE_ERROR (parse_fulfillment_status): Unexpected output: {parsed_json}")
+            return {"fulfilled": None, "error": "Invalid LLM output for fulfillment"}
+
+
+    def parse_next_action_decision(self, user_response, original_request_context_summary, was_last_item_fulfilled, has_more_options_for_current_request):
+        """
+        Parses user's response to "What would you like to do next?"
+        """
+        was_last_item_fulfilled_str = str(was_last_item_fulfilled).lower()
+        has_more_options_str = str(has_more_options_for_current_request).lower()
+
+        prompt = f"""
+You are an assistant helping a user decide what to do next in a shopping mall.
+The user was just at a store, or has just finished a sequence of store visits for a specific request.
+Context of the original shopping request: "{original_request_context_summary}"
+At the last store visited (or for the last item discussed), was the request fulfilled? {was_last_item_fulfilled_str}
+Are there more store options available for THIS original request? {has_more_options_str}
+
+The user has been asked a question like: "What would you like to do next? We can look for something else entirely, continue with the current request if options exist, or stop for now."
+User's response: "{user_response}"
+
+Determine the user's intent. Respond STRICTLY with VALID JSON.
+The JSON object must have:
+- "intent": string, must be one of "new_request", "continue_current_request", "stop_interaction".
+- "new_query_text": string or null. If intent is "new_request", this should contain the user's new query. Otherwise, it should be null.
+
+Priority for determining intent:
+1. If user clearly asks for something new (e.g., "let's find shoes", "I need a hat"), intent is "new_request".
+2. If user wants to continue the current search (e.g., "other options for X", "next store for X", "yes" to a "see more options?" question) intent is "continue_current_request".
+3. If user wants to stop, is satisfied and doesn't ask for something new, or response is unclear but not a new request or continuation, intent is "stop_interaction".
+
+Examples:
+Original Request: "a red dress", Fulfilled: false, More Options: true
+User Response: "Let's look for shoes now." -> Output: {{"intent": "new_request", "new_query_text": "look for shoes"}}
+User Response: "Are there other places for dresses?" -> Output: {{"intent": "continue_current_request", "new_query_text": null}}
+User Response: "No, I'm good for now." -> Output: {{"intent": "stop_interaction", "new_query_text": null}}
+
+Original Request: "a toy", Fulfilled: true, More Options: true
+User Response: "I'm happy with this toy. Let's stop." -> Output: {{"intent": "stop_interaction", "new_query_text": null}}
+User Response: "Great! What else do you have for toys?" -> Output: {{"intent": "continue_current_request", "new_query_text": null}}
+
+Original Request: "a blue shirt", Fulfilled: false, More Options: false
+User Response: "Any other stores for shirts?" (Even if user asks to continue, if no more options, the system will handle it. LLM should still capture the intent if expressed).
+Output: {{"intent": "continue_current_request", "new_query_text": null}}
+User Response: "Okay, then just stop." -> Output: {{"intent": "stop_interaction", "new_query_text": null}}
+
+
+User Response: "{user_response}"
+Respond ONLY with valid JSON:
+"""
+        parsed_json = self._call_groq_api(prompt, max_tokens=200)
+        if "error" in parsed_json: # Propagate API error
+             return parsed_json
+
+        if isinstance(parsed_json, dict) and \
+           parsed_json.get("intent") in ["new_request", "continue_current_request", "stop_interaction"]:
+            if parsed_json["intent"] == "new_request" and not isinstance(parsed_json.get("new_query_text"), str):
+                print(f"LLM_VALIDATE_WARNING (parse_next_action): 'new_request' intent but new_query_text is missing or not string: {parsed_json}")
+                # Attempt to fix or default
+                parsed_json["new_query_text"] = user_response # Fallback, might not be ideal
+            elif parsed_json["intent"] != "new_request":
+                parsed_json["new_query_text"] = None # Ensure it's null if not new_request
+            return parsed_json
+        else:
+            print(f"LLM_VALIDATE_ERROR (parse_next_action): Unexpected output: {parsed_json}")
+            return {"intent": "stop_interaction", "new_query_text": None, "error": "Invalid LLM output for next action"}
 
 
 if __name__ == '__main__':
-    print("Testing llm_groq_parser.py (V3 logic)...")
+    print("Testing llm_groq_parser.py (with new methods)...")
     parser = GroqQueryParser()
-    # These lists would normally come from KnowledgeGraphService in main_robot_controller
+    if not parser.client:
+        print("WARNING: Groq client not initialized. Some tests will use mocked LLM failure paths.")
+
     parser.set_knowledge_base_lists(
-        store_names=["Urban Stylez", "Classic Comfort", "Footwear Palace", "Active & Street", "Kids Playworld"],
-        item_categories=[c["name"] for c in fashion_mnist_classes],
-        brands=fictional_brands_list,
+        store_names=["Urban Stylez", "Classic Comfort", "Footwear Palace", "Active & Street", "Kids Playworld", "Toy Emporium"],
+        item_categories=[c["name"] for c in fashion_mnist_classes] + ["Toy"], # Ensure "Toy" is there
+        brands=fictional_brands_list + ["ToyBrand"],
         colors=colors_list
     )
 
+    print("\n--- Test generate_structured_query ---")
     test_queries = [
         ("I need a shirt for my father. He prefers Classic Co.", "mother", None),
         ("I'm looking for a new coat for myself. I've started liking the color black.", "mother", None),
-        ("My child prefers green trousers. I myself actually like red.", "mother", {"item_feedback": {}}), # profile_ctx is for child
-        ("What are Mum's preferences?", "father", None),
+        ("My child prefers green trousers. I myself actually like red.", "mother", {"item_feedback": {}}),
         ("No more, thanks.", "mother", None)
     ]
-
     for query, speaker, profile_ctx_for_llm in test_queries:
         print(f"\nTest Query: \"{query}\" (Speaker: {speaker if speaker else 'Unknown'})")
         structured = parser.generate_structured_query(query,
@@ -314,9 +408,37 @@ if __name__ == '__main__':
                                                       shopping_for_user_profile_context=profile_ctx_for_llm)
         print(f"Structured Output: {json.dumps(structured, indent=2)}")
 
-    print("\nTesting feedback parsing...")
-    feedback_text = "It was great, I found an amazing blue Dress from Glamora! The staff were helpful."
+    print("\n--- Test parse_feedback_to_profile_update ---")
+    feedback_text_shop = "It was great, I found an amazing blue Dress from Glamora! The staff were helpful."
     shop = "Chic Boutique"
-    items_sought = ["Dress"]
-    parsed_feedback = parser.parse_feedback_to_profile_update(feedback_text, shop, items_sought)
-    print(f"Parsed Feedback: {json.dumps(parsed_feedback, indent=2)}")
+    items_sought_shop = ["Dress"]
+    parsed_feedback_shop = parser.parse_feedback_to_profile_update(feedback_text_shop, shop, items_sought_shop)
+    print(f"Shop Feedback Parsed: {json.dumps(parsed_feedback_shop, indent=2)}")
+
+    print("\n--- Test parse_fulfillment_status ---")
+    fulfillment_tests = [
+        ("Yes, I found a perfect one!", "a red dress", True),
+        ("No, they didn't have my size.", "a blue shirt", False),
+        ("It was okay, but not exactly what I wanted.", "toys", False),
+        ("I'm not sure yet.", "a specific book", None)
+    ]
+    for text, item_desc, _ in fulfillment_tests:
+        print(f"Fulfillment Test - User: \"{text}\" (for: \"{item_desc}\")")
+        status = parser.parse_fulfillment_status(text, item_desc)
+        print(f"Parsed Fulfillment: {json.dumps(status, indent=2)}")
+
+
+    print("\n--- Test parse_next_action_decision ---")
+    next_action_tests = [
+        # user_response, original_request_context_summary, was_last_item_fulfilled, has_more_options_for_current_request
+        ("Let's look for shoes now.", "a red dress", False, True),
+        ("Are there other places for dresses?", "a red dress", False, True),
+        ("No, I'm good for now.", "a red dress", False, True),
+        ("I'm happy with this toy. Let's stop.", "a toy", True, True),
+        ("Great! What else do you have for toys?", "a toy", True, True),
+        ("Any other stores for shirts?", "a blue shirt", False, False),
+    ]
+    for resp, orig_req, fulfilled, more_opts in next_action_tests:
+        print(f"\nNext Action Test - User: \"{resp}\" (Orig: \"{orig_req}\", Fulfilled: {fulfilled}, MoreOpts: {more_opts})")
+        action = parser.parse_next_action_decision(resp, orig_req, fulfilled, more_opts)
+        print(f"Parsed Next Action: {json.dumps(action, indent=2)}")
