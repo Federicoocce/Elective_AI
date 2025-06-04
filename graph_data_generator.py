@@ -78,7 +78,7 @@ def generate_fictional_products_and_stores():
         base_class_id = fm_class["id"]
         base_class_name = fm_class["name"]
         category_type = fm_class["category"]
-        num_instances_per_class = random.randint(2, 5)
+        num_instances_per_class = random.randint(3, 6)
         for _ in xrange(num_instances_per_class):
             product_template_list = product_name_templates.get(base_class_name, ["Generic {}".format(base_class_name)])
             specific_name_base = random.choice(product_template_list)
@@ -132,7 +132,7 @@ def generate_fictional_products_and_stores():
         base_class_id_of_product = product["base_class_id"]
         possible_stores = [store for store in stores_data if base_class_id_of_product in store["sells_base_classes"]]
         if possible_stores:
-            num_stores_for_this_product = random.randint(1, min(len(possible_stores), 2))
+            num_stores_for_this_product = random.randint(1, min(len(possible_stores), 3))
             selected_stores = random.sample(possible_stores, num_stores_for_this_product)
             for store in selected_stores:
                 relationships_data.append((product_id, "SOLD_IN", store["id"]))

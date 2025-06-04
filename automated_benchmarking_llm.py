@@ -19,20 +19,23 @@ class AutomatedBenchmarkingLLM:
         self.kg_entities = { 
             "item_categories": [], "brands": [], "colors": [], "store_names": []
         }
+        self.sample_products_from_kg = [] # New attribute for existing products
         self.last_item_found_at_store = False 
 
-    def set_knowledge_base(self, item_categories, brands, colors, store_names):
+    def set_knowledge_base(self, item_categories, brands, colors, store_names, sample_products=None): # Added sample_products
         self.kg_entities["item_categories"] = item_categories
         self.kg_entities["brands"] = brands
         self.kg_entities["colors"] = colors
         self.kg_entities["store_names"] = store_names
-        print(f"BENCHMARKING_LLM: Knowledge base set. Persona: {self.persona}")
+        self.sample_products_from_kg = sample_products if sample_products else []
+        print(f"BENCHMARKING_LLM: Knowledge base set. Persona: {self.persona}. Sample products: {len(self.sample_products_from_kg)}")
+
 
     def _call_groq_api_for_simulation(self, prompt, max_tokens=100):
         if not self.client:
             print("BENCHMARKING_LLM_ERROR: Groq client not initialized. Cannot make API call.")
             if "initial shopping query" in prompt.lower(): return "I need a new coat."
-            if "who is this request for" in prompt.lower(): return f"It's for the {self.persona}."
+            if "who is this request for" in prompt.lower(): return f"It's for the {self.persona}." # Fallback if specific not hit
             if "shall we go there" in prompt.lower(): return "Yes, let's go."
             if "when you're ready" in prompt.lower(): return "Okay, I'm ready now."
             if "did you find what you were looking for" in prompt.lower(): return "Yes, I found a great one!"
@@ -59,17 +62,9 @@ class AutomatedBenchmarkingLLM:
         return f"I am the {self.persona}."
 
     def generate_initial_query(self):
-        item_type = random.choice(self.kg_entities["item_categories"]) if self.kg_entities["item_categories"] else "something nice"
-        color = random.choice(self.kg_entities["colors"]) if self.kg_entities["colors"] else ""
-        brand = random.choice(self.kg_entities["brands"]) if self.kg_entities["brands"] and random.random() < 0.3 else "" 
-        
-        query_parts = []
-        if color: query_parts.append(color)
-        if brand: query_parts.append(brand)
-        query_parts.append(item_type)
-        
-        shopping_target_persona = self.persona # Default to self
-        if random.random() < 0.4: # Chance to shop for someone else
+        # Determine shopping target persona first
+        shopping_target_persona = self.persona 
+        if random.random() < 0.4: 
             possible_targets = [r for r in ["mother", "father", "child"] if r != self.persona]
             if possible_targets:
                 shopping_target_persona = random.choice(possible_targets)
@@ -78,8 +73,35 @@ class AutomatedBenchmarkingLLM:
         if shopping_target_persona == "child": query_subject = "for my child"
         elif shopping_target_persona == "father": query_subject = "for my father"
         elif shopping_target_persona == "mother" and self.persona != "mother": query_subject = "for my mother"
+
+        # 90% chance to generate a query for an existing product if samples are available
+        if self.sample_products_from_kg and random.random() < 0.9:
+            product_data = random.choice(self.sample_products_from_kg)
+            item_type = product_data.get('base_class_name')
+            color = product_data.get('color')
+            brand = product_data.get('brand')
             
-        self.current_shopping_goal_summary = f"{' '.join(query_parts)} {query_subject}"
+            query_parts = []
+            # Make the query slightly less specific sometimes
+            if color and color != "Various" and random.random() < 0.8: query_parts.append(color)
+            if brand and random.random() < 0.6: query_parts.append(brand)
+            # Always include item type if from sample product
+            if item_type: query_parts.append(item_type)
+            else: # Fallback if item_type was somehow missing from sample
+                item_type = random.choice(self.kg_entities["item_categories"]) if self.kg_entities["item_categories"] else "something nice"
+                query_parts.append(item_type)
+            
+            self.current_shopping_goal_summary = f"{' '.join(query_parts)} {query_subject}"
+        else: # 10% chance for original random query (might not exist, or if no samples)
+            item_type = random.choice(self.kg_entities["item_categories"]) if self.kg_entities["item_categories"] else "something nice"
+            color = random.choice(self.kg_entities["colors"]) if self.kg_entities["colors"] else ""
+            brand = random.choice(self.kg_entities["brands"]) if self.kg_entities["brands"] and random.random() < 0.3 else "" 
+            
+            query_parts = []
+            if color: query_parts.append(color)
+            if brand: query_parts.append(brand)
+            query_parts.append(item_type)
+            self.current_shopping_goal_summary = f"{' '.join(query_parts)} {query_subject}"
         
         prompt = f"""You are impersonating a '{self.persona}' in a mall, talking to a robot assistant.
 Generate a natural, concise initial shopping query.
@@ -94,18 +116,32 @@ Your query (just the query, no preamble):"""
         return self._call_groq_api_for_simulation(prompt, max_tokens=50)
 
     def respond_to_clarify_shopping_target(self, robot_query_summary):
-        target_user = self.persona # Default assumption if not clear from current_shopping_goal_summary
-        if self.current_shopping_goal_summary:
+        intended_target_role = self.persona 
+        if self.current_shopping_goal_summary: # Check the summary of the *current* query being clarified
             csl = self.current_shopping_goal_summary.lower()
-            if "child" in csl: target_user = "child"
-            elif "father" in csl or "dad" in csl: target_user = "father"
-            elif "mother" in csl or "mum" in csl: target_user = "mother"
-            
-        prompt = f"""You are impersonating a '{self.persona}'. The robot asked who the request '{robot_query_summary}' is for.
-You intend it for '{target_user}'.
-Respond naturally. Examples: "For me.", "It's for the child.", "For my husband."
+            if "for my child" in csl or "for the child" in csl : intended_target_role = "child"
+            elif "for my father" in csl or "for dad" in csl: intended_target_role = "father"
+            elif "for my mother" in csl or "for mum" in csl: intended_target_role = "mother"
+            elif "for myself" in csl or "for me" in csl: intended_target_role = self.persona
+            # If current_shopping_goal_summary doesn't specify "for X", it implies it's for self.persona
 
-Your response (just the response):"""
+        response_options = {
+            "mother": [f"It's for Mother.", f"Mother.", f"For the mother."],
+            "father": [f"It's for Father.", f"Father.", f"For the father."],
+            "child":  [f"It's for the Child.", f"The Child.", f"For my child."]
+        }
+        
+        specific_response_idea = f"It's for {intended_target_role.capitalize()}." # Default idea
+        if intended_target_role in response_options:
+            specific_response_idea = random.choice(response_options[intended_target_role])
+
+        prompt = f"""You are impersonating a '{self.persona}'. The robot asked who the request '{robot_query_summary}' is for.
+You internally know the request is intended for '{intended_target_role}'.
+Your goal is to respond naturally but clearly stating the role (Mother, Father, or Child) so the robot can parse it.
+You are thinking of saying something like: '{specific_response_idea}'.
+Examples of good, clear responses: "For Mother.", "It's for the child.", "Father."
+
+Your response (just the response, ensure it's parsable by a system looking for 'mother', 'father', or 'child'):"""
         return self._call_groq_api_for_simulation(prompt, max_tokens=20)
 
     def decide_to_visit_store(self, store_name_suggested, item_context_summary):
@@ -116,7 +152,6 @@ The robot suggested visiting '{store_name_suggested}' and asked 'Shall we go the
 Respond with a short, natural confirmation or rejection like '{decision_prompt}'.
 
 Your response (just 'Yes/No' or a short phrase):"""
-        # Corrected: call the simulation API method
         return self._call_groq_api_for_simulation(prompt, max_tokens=15)
 
     def acknowledge_arrival_and_readiness(self):
@@ -133,11 +168,11 @@ Your response (short and natural):"""
         found_it = random.random() < 0.6 
         self.last_item_found_at_store = found_it
         
-        item_name_only = item_context_summary.split(' for ')[0] # try to get just item
-        if " " in item_name_only and len(item_name_only.split(' ')) > 2 : # if "red long-sleeve shirt"
-            item_name_only = " ".join(item_name_only.split(' ')[-2:]) # take last two words
+        item_name_only = item_context_summary.split(' for ')[0] 
+        if " " in item_name_only and len(item_name_only.split(' ')) > 2 : 
+            item_name_only = " ".join(item_name_only.split(' ')[-2:]) 
         elif " " in item_name_only:
-            item_name_only = item_name_only.split(' ')[-1] # take last word
+            item_name_only = item_name_only.split(' ')[-1] 
 
 
         response_if_found = f"Yes, I found a great {item_name_only}!"
@@ -190,9 +225,16 @@ Your response (short and natural, or 'no feedback'):"""
                 action_choice = "stop"
 
         if action_choice == "new_request":
-            new_item = random.choice(self.kg_entities["item_categories"]) if self.kg_entities["item_categories"] else "something else"
+            # When starting a new request, try to pick an existing item 70% of the time if samples available
+            if self.sample_products_from_kg and random.random() < 0.7:
+                new_product_sample = random.choice(self.sample_products_from_kg)
+                new_item = new_product_sample.get('base_class_name', "something else")
+                # Could add color/brand to make it more specific, but simple item type is fine for "what next"
+            else: # Fallback to general category
+                new_item = random.choice(self.kg_entities["item_categories"]) if self.kg_entities["item_categories"] else "something else"
+            
             new_query_text_for_llm = f"Okay, now I'm looking for a {new_item}."
-            self.current_shopping_goal_summary = new_item 
+            self.current_shopping_goal_summary = new_item # Update goal for next potential clarification
         
         fulfillment_str = "was fulfilled" if was_last_item_fulfilled else "was not fulfilled"
         options_str = "there are more options" if has_more_options_for_current else "no more options"
@@ -215,9 +257,15 @@ Your response (short and natural):"""
         return self._call_groq_api_for_simulation(prompt, max_tokens=40)
 
     def respond_to_anything_else(self):
-        if random.random() < 0.1: # Very small chance for one more simple request
-            new_item = random.choice(self.kg_entities["item_categories"]) if self.kg_entities["item_categories"] else "a small thing"
-            self.current_shopping_goal_summary = new_item
+        if random.random() < 0.1: 
+            # When starting a new request here, try to pick an existing item 70% of the time if samples available
+            if self.sample_products_from_kg and random.random() < 0.7:
+                new_product_sample = random.choice(self.sample_products_from_kg)
+                new_item = new_product_sample.get('base_class_name', "a small thing")
+            else: # Fallback to general category
+                new_item = random.choice(self.kg_entities["item_categories"]) if self.kg_entities["item_categories"] else "a small thing"
+
+            self.current_shopping_goal_summary = new_item # Update goal for next potential clarification
             return f"Actually, yes, I also need {new_item}."
         else:
             return "No, that's everything. Thank you!"
