@@ -3,21 +3,228 @@
     "favorite_colors": [],
     "favorite_brands": [],
     "preferred_categories": [],
-    "shop_reviews": {},
-    "item_feedback": {}
+    "shop_reviews": {
+      "Classic Comfort": {
+        "last_visit_fulfilled": false,
+        "rating": 2,
+        "notes_positive": [],
+        "notes_negative": [
+          "didn't have it in stock"
+        ]
+      },
+      "Urban Stylez": {
+        "last_visit_fulfilled": false,
+        "rating": 2,
+        "notes_positive": [],
+        "notes_negative": [
+          "selection for shirts wasn't quite what I was looking for"
+        ]
+      },
+      "Outerwear Essentials": {
+        "last_visit_fulfilled": false,
+        "rating": 3,
+        "notes_positive": [
+          "good selection"
+        ],
+        "notes_negative": [
+          "selection for shirts wasn't quite what I was expecting"
+        ]
+      },
+      "Everyday Apparel": {
+        "last_visit_fulfilled": false,
+        "rating": 2,
+        "notes_positive": [],
+        "notes_negative": [
+          "selection wasn't quite right",
+          "couldn't find something specific"
+        ]
+      },
+      "Chic Boutique": {
+        "last_visit_fulfilled": true,
+        "rating": 5,
+        "notes_positive": [
+          "good selection of Sandal",
+          "good service"
+        ],
+        "notes_negative": []
+      }
+    },
+    "item_feedback": {
+      "Pullover": {
+        "likes": [],
+        "dislikes": [
+          "Purple Casual Denim Shirt",
+          "selection wasn't quite what I was looking for"
+        ]
+      },
+      "Shirt": {
+        "likes": [],
+        "dislikes": [
+          "selection wasn't quite what I was expecting",
+          "selection wasn't quite right"
+        ]
+      },
+      "Sandal": {
+        "likes": [
+          "Beige Strappy Heeled",
+          "Heeled"
+        ],
+        "dislikes": []
+      }
+    }
   },
   "father": {
     "favorite_colors": [],
     "favorite_brands": [],
     "preferred_categories": [],
-    "shop_reviews": {},
-    "item_feedback": {}
+    "shop_reviews": {
+      "Classic Comfort": {
+        "last_visit_fulfilled": false,
+        "rating": 2,
+        "notes_positive": [
+          "friendly staff",
+          "welcoming and cozy atmosphere",
+          "happy with my visit",
+          "found the Teal Quilted"
+        ],
+        "notes_negative": [
+          "didn't find anything I wanted",
+          "didn't have the specific Plush Animal I was looking for"
+        ]
+      },
+      "Active & Street": {
+        "last_visit_fulfilled": false,
+        "rating": 2,
+        "notes_positive": [
+          "whole setup",
+          "blown away"
+        ],
+        "notes_negative": [
+          "selection wasn't quite right for me today"
+        ]
+      },
+      "Urban Stylez": {
+        "last_visit_fulfilled": true,
+        "rating": 5,
+        "notes_positive": [
+          "found a great item",
+          "good selection of Pink Crisp Cotton Shirt",
+          "ambiance",
+          "service",
+          "good selection of Bag"
+        ],
+        "notes_negative": [
+          "didn't have the specific Pullover I was looking for"
+        ]
+      },
+      "Chic Boutique": {
+        "last_visit_fulfilled": false,
+        "rating": 3,
+        "notes_positive": [
+          "great store"
+        ],
+        "notes_negative": [
+          "couldn't find what I was looking for"
+        ]
+      },
+      "Footwear Palace": {
+        "last_visit_fulfilled": false,
+        "rating": 2,
+        "notes_positive": [],
+        "notes_negative": [
+          "didn't have it in stock"
+        ]
+      }
+    },
+    "item_feedback": {
+      "Pullover": {
+        "likes": [],
+        "dislikes": [
+          "couldn't find"
+        ]
+      },
+      "Trouser": {
+        "likes": [],
+        "dislikes": []
+      },
+      "Coat": {
+        "likes": [
+          "Teal Quilted"
+        ],
+        "dislikes": [
+          "couldn't find"
+        ]
+      },
+      "Sandal": {
+        "likes": [],
+        "dislikes": [
+          "selection"
+        ]
+      },
+      "Sneaker": {
+        "likes": [
+          "White Leather"
+        ],
+        "dislikes": [
+          "White Leather Espadrille"
+        ]
+      },
+      "T-shirt/top": {
+        "likes": [
+          "Pink Crisp Cotton Shirt"
+        ],
+        "dislikes": []
+      },
+      "Bag": {
+        "likes": [
+          "Blue Crossbody Messenger",
+          "CarryAll"
+        ],
+        "dislikes": []
+      },
+      "Toy": {
+        "likes": [],
+        "dislikes": [
+          "couldn't find the specific one I was looking for"
+        ]
+      }
+    }
   },
   "child": {
     "favorite_colors": [],
     "favorite_brands": [],
     "preferred_categories": [],
-    "shop_reviews": {},
-    "item_feedback": {}
+    "shop_reviews": {
+      "Classic Comfort": {
+        "last_visit_fulfilled": false,
+        "rating": 2,
+        "notes_positive": [],
+        "notes_negative": [
+          "selection for coats wasn't quite right for me"
+        ]
+      },
+      "Urban Stylez": {
+        "last_visit_fulfilled": false,
+        "rating": 2,
+        "notes_positive": [],
+        "notes_negative": [
+          "couldn't find the Blue Strappy Heeled Sandal"
+        ]
+      }
+    },
+    "item_feedback": {
+      "Coat": {
+        "likes": [],
+        "dislikes": [
+          "selection wasn't quite right"
+        ]
+      },
+      "Sandal": {
+        "likes": [],
+        "dislikes": [
+          "couldn't find the Blue Strappy Heeled Sandal"
+        ]
+      }
+    }
   }
 }

@@ -2,6 +2,7 @@
 import re
 import random
 import networkx as nx
+import os # For checking file existence
 
 # Handle Python 2/3 compatibility for xrange
 try:
@@ -53,22 +54,32 @@ product_name_templates = {
     "Toy": ["Action Figure", "Building Blocks Set", "Plush Animal", "Educational Toy", "RC Car"]
 }
 
-def load_store_coordinates(filename):
+def load_store_coordinates(filename="location.txt"):
     """Loads store coordinates from a text file."""
     coords_list = []
+    if not os.path.exists(filename):
+        print(f"GRAPH_DATA_GENERATOR_ERROR: Coordinates file '{filename}' not found. Stores will use default coordinates (0,0,0).")
+        return coords_list
+
     with open(filename, 'r') as f:
         for line_num, line in enumerate(f, 1):
             line = line.strip()
+            if not line or line.startswith('#'): # Skip empty lines or comments
+                continue
             numbers = re.findall(r"[-+]?\d*\.\d+|[-+]?\d+", line)
             if len(numbers) >= 2:
                 try:
                     x = float(numbers[0])
                     y = float(numbers[1])
-                    coords_list.append({'x': x, 'y': y, 'theta': 0.0})
+                    theta = float(numbers[2]) if len(numbers) >= 3 else 0.0 # Optional theta, defaults to 0.0
+                    coords_list.append({'x': x, 'y': y, 'theta': theta})
                 except ValueError:
-                    print(f"Warning: Invalid numbers in line {line_num}: '{line}'. Skipping.")
+                    print(f"GRAPH_DATA_GENERATOR_WARNING: Invalid numbers in line {line_num} of '{filename}': '{line}'. Skipping.")
             else:
-                print(f"Warning: Line {line_num} has {len(numbers)} numbers (expected 2). Skipping.")
+                print(f"GRAPH_DATA_GENERATOR_WARNING: Line {line_num} of '{filename}' has {len(numbers)} numbers (expected 2 or 3). Skipping line: '{line}'.")
+    
+    if not coords_list:
+        print(f"GRAPH_DATA_GENERATOR_WARNING: No valid coordinates loaded from '{filename}'. Stores might use default coordinates.")
     return coords_list
 
 def generate_fictional_products_and_stores():
@@ -113,8 +124,10 @@ def generate_fictional_products_and_stores():
         {"id": "S9", "name": "Kids Playworld", "type": "Toy Store", "location_text": "Floor 2, Unit 205", "sells_base_classes": ["I11"]}
     ]
 
-    # Load and assign coordinates
-    coords_list = load_store_coordinates('location.txt')
+    coords_list = load_store_coordinates() # Uses default filename "location.txt"
+    if not coords_list and stores_data:
+        print("GRAPH_DATA_GENERATOR_WARNING: No coordinates loaded. All stores will use default (0,0,0).")
+
     for idx, store_info in enumerate(stores_data):
         if idx < len(coords_list):
             store_info.update({
@@ -124,7 +137,10 @@ def generate_fictional_products_and_stores():
             })
         else:
             store_info.update({"map_x": 0.0, "map_y": 0.0, "map_theta": 0.0})
-            print(f"Warning: Store {store_info['id']} at index {idx} has default coordinates.")
+            if coords_list: # Only print warning if some coords were loaded but not enough
+                print(f"GRAPH_DATA_GENERATOR_WARNING: Not enough coordinates in location.txt for all stores. Store {store_info['id']} (index {idx}) gets default coordinates.")
+            elif not coords_list and idx == 0: # Only print once if file was missing entirely
+                 pass # Initial warning about missing file covers this
 
     relationships_data = []
     for product in fictional_products_data:
@@ -163,6 +179,21 @@ def create_mall_graph():
     return mall_graph
 
 if __name__ == '__main__':
+    # Create a dummy location.txt for testing if it doesn't exist
+    if not os.path.exists("location.txt"):
+        print("Creating dummy location.txt for testing...")
+        with open("location.txt", "w") as f:
+            f.write("3.16 -1.73 0.0  # S1 Urban Stylez\n")
+            f.write("-1.99 -2.87 0.0 # S2 Classic Comfort\n")
+            f.write("-7.14 -3.96 0.0 # S3 Footwear Palace\n")
+            f.write("5.6 2.75 0.0    # S4 Chic Boutique\n")
+            f.write("7.69 -4.62 0.0  # S5 Outerwear Essentials\n")
+            f.write("-3.09 6.97 0.0  # S6 The Bag & Accessory Nook\n")
+            f.write("-12.68 4.29 0.0 # S7 Everyday Apparel\n")
+            f.write("-10.9 -3.52 0.0 # S8 Active & Street\n")
+            f.write("0.0 0.0 0.0     # S9 Kids Playworld (Example if coords not set)\n")
+
+
     graph = create_mall_graph()
     print("Graph created with {} nodes and {} edges.".format(graph.number_of_nodes(), graph.number_of_edges()))
     
@@ -173,7 +204,7 @@ if __name__ == '__main__':
         if data.get('label_node') == 'Store' and store_count < 3:
             print(f"Store {node_id}:")
             print(f"  Name: {data['name']}")
-            print(f"  Coordinates: ({data['map_x']}, {data['map_y']})")
+            print(f"  Coordinates: ({data.get('map_x', 'N/A')}, {data.get('map_y', 'N/A')}, {data.get('map_theta', 'N/A')})")
             print(f"  Location: {data['location']}\n")
             store_count += 1
 
