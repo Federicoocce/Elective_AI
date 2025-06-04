@@ -3,22 +3,8 @@
     "favorite_colors": [],
     "favorite_brands": [],
     "preferred_categories": [],
-    "shop_reviews": {
-      "Kids Playworld": {
-        "last_visit_fulfilled": true,
-        "rating": 5,
-        "notes_positive": [
-          "Good selection here"
-        ],
-        "notes_negative": []
-      }
-    },
-    "item_feedback": {
-      "Ankle boot": {
-        "likes": [],
-        "dislikes": []
-      }
-    }
+    "shop_reviews": {},
+    "item_feedback": {}
   },
   "father": {
     "favorite_colors": [],

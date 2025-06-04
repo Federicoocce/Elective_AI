@@ -15,257 +15,425 @@ class AutomatedBenchmarkingLLM:
             print("BENCHMARKING_LLM_WARNING: GROQ_API_KEY not found. LLM calls will be mocked or fail.")
         
         self.persona = persona
-        self.current_shopping_goal_summary = None 
         self.kg_entities = { 
             "item_categories": [], "brands": [], "colors": [], "store_names": []
         }
-        self.sample_products_from_kg = [] # New attribute for existing products
+        self.sample_products_from_kg = []
+        
+        self.shopping_list = [] 
+        self.current_target_item_index = -1
+        self.revealed_details = {} 
+        self.favorite_stores_for_this_session = []
         self.last_item_found_at_store = False 
+        self.current_shopping_goal_summary = "" # General summary of what user is vague about
 
-    def set_knowledge_base(self, item_categories, brands, colors, store_names, sample_products=None): # Added sample_products
+    def _get_current_target_product(self):
+        if 0 <= self.current_target_item_index < len(self.shopping_list):
+            return self.shopping_list[self.current_target_item_index]
+        return None
+
+    def _initialize_shopping_session_goals(self):
+        self.shopping_list = []
+        self.current_target_item_index = -1
+        self.revealed_details = {}
+        self.favorite_stores_for_this_session = []
+
+        if not self.sample_products_from_kg: return
+
+        num_items_to_shop_for = random.randint(1, 2)
+        if len(self.sample_products_from_kg) < num_items_to_shop_for:
+            num_items_to_shop_for = len(self.sample_products_from_kg)
+        
+        if num_items_to_shop_for == 0: return # Cannot make a shopping list
+
+        potential_targets = random.sample(self.sample_products_from_kg, k=num_items_to_shop_for)
+        
+        for product_data in potential_targets:
+            self.shopping_list.append({
+                "product_name": product_data.get('name'), 
+                "category": product_data.get('base_class_name'),
+                "color": product_data.get('color'),
+                "brand": product_data.get('brand'),
+                "found": False
+            })
+        
+        if self.shopping_list:
+            self.current_target_item_index = 0
+            self._prepare_revealed_details_for_current_target()
+
+        if self.kg_entities["store_names"]:
+            num_fav_stores = random.randint(0, 2)
+            if num_fav_stores > 0 and len(self.kg_entities["store_names"]) >= num_fav_stores:
+                self.favorite_stores_for_this_session = random.sample(self.kg_entities["store_names"], k=num_fav_stores)
+        
+        print(f"BENCHMARKING_LLM_SESSION_GOALS: Persona: {self.persona}")
+        print(f"  Shopping List ({len(self.shopping_list)} items):")
+        for i, item in enumerate(self.shopping_list):
+            print(f"    {i+1}. {item['category']} (Color: {item['color']}, Brand: {item['brand']}) - Target Name: '{item['product_name']}'")
+        print(f"  Favorite Stores for this session: {self.favorite_stores_for_this_session}")
+
+
+    def _prepare_revealed_details_for_current_target(self):
+        self.revealed_details = {} 
+        target_product = self._get_current_target_product()
+        if target_product:
+            self.revealed_details['category'] = target_product['category']
+            if random.random() < 0.3 and target_product['color'] and target_product['color'] != "Various":
+                self.revealed_details['color'] = target_product['color']
+            if random.random() < 0.2 and target_product['brand']:
+                 self.revealed_details['brand'] = target_product['brand']
+
+
+    def set_knowledge_base(self, item_categories, brands, colors, store_names, sample_products=None):
         self.kg_entities["item_categories"] = item_categories
         self.kg_entities["brands"] = brands
         self.kg_entities["colors"] = colors
         self.kg_entities["store_names"] = store_names
         self.sample_products_from_kg = sample_products if sample_products else []
-        print(f"BENCHMARKING_LLM: Knowledge base set. Persona: {self.persona}. Sample products: {len(self.sample_products_from_kg)}")
-
+        print(f"BENCHMARKING_LLM: Knowledge base set for persona {self.persona}. Sample products available: {len(self.sample_products_from_kg)}")
+        self._initialize_shopping_session_goals()
 
     def _call_groq_api_for_simulation(self, prompt, max_tokens=100):
         if not self.client:
-            print("BENCHMARKING_LLM_ERROR: Groq client not initialized. Cannot make API call.")
-            if "initial shopping query" in prompt.lower(): return "I need a new coat."
-            if "who is this request for" in prompt.lower(): return f"It's for the {self.persona}." # Fallback if specific not hit
-            if "shall we go there" in prompt.lower(): return "Yes, let's go."
-            if "when you're ready" in prompt.lower(): return "Okay, I'm ready now."
-            if "did you find what you were looking for" in prompt.lower(): return "Yes, I found a great one!"
-            if "any other feedback" in prompt.lower(): return "The selection was good."
-            if "what next" in prompt.lower(): return "Let's look for shoes now."
-            return "Okay."
+            # This mock section needs to be smarter or removed if relying purely on Groq when available.
+            # For now, it's a very basic fallback.
+            print(f"BENCHMARKING_LLM_ERROR: Groq client not initialized. Mocking LLM call for prompt starting with: '{prompt[:50]}...'")
+            target_product = self._get_current_target_product()
+            
+            if "initial shopping query" in prompt:
+                return f"I'm thinking about getting some {self.revealed_details.get('category', 'new clothes')}."
+            if "who is this request for" in prompt:
+                return f"It's for {self.persona}."
+            if "shall we go there" in prompt: # Simplified for mock
+                return "Yes, let's go." if random.random() < 0.85 else "Hmm, maybe not that one."
+            if "when you're ready" in prompt:
+                return random.choice(["Okay, I'm ready.", "I've had a look.", "Finished looking."])
+            if "did you find what you were looking for" in prompt:
+                # Mock fulfillment based on a chance if target_product exists
+                if target_product and random.random() < 0.6: # 60% chance to "find" the generic category
+                    self.last_item_found_at_store = True
+                    target_product['found'] = True 
+                    return f"Yes, I found a great {target_product['category']}!"
+                else:
+                    self.last_item_found_at_store = False
+                    return f"No, not quite the {target_product['category'] if target_product else 'item'} I wanted."
+            if "any other feedback" in prompt:
+                if self.last_item_found_at_store: return "It was a good find!"
+                else: return "The selection wasn't what I hoped for."
+            if "what next" in prompt:
+                # Simulate _move_to_next_target_item_or_stop logic for mock
+                if target_product and target_product['found']:
+                    # Check if there's a next item
+                    next_idx = self.current_target_item_index + 1
+                    if next_idx < len(self.shopping_list):
+                        return f"Now I'm thinking about a {self.shopping_list[next_idx]['category']}."
+                    else:
+                        return "That's all for now, thanks!"
+                else: # Current item not found or no items
+                    return "Okay, let's stop looking for that then."
+            if "anything else" in prompt:
+                 return "No, that's everything. Thank you!"
+
+            return "Okay, I understand." # Generic fallback for unhandled mock cases
 
         try:
             chat_completion = self.client.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
-                model="llama-3.1-8b-instant", 
-                temperature=0.7, 
-                max_tokens=max_tokens,
+                model="llama-3.1-8b-instant", temperature=0.6, max_tokens=max_tokens,
             )
-            response_text = chat_completion.choices[0].message.content.strip()
-            if response_text.startswith('"') and response_text.endswith('"'):
-                response_text = response_text[1:-1]
+            response_text = chat_completion.choices[0].message.content.strip().replace('"', '')
             return response_text
         except Exception as e:
             print(f"BENCHMARKING_LLM_ERROR: Groq API error: {str(e)}")
-            return "I'm not sure how to respond to that right now." 
+            return "I'm not sure how to respond to that right now."
+
 
     def generate_initial_speaker_id(self):
         return f"I am the {self.persona}."
 
     def generate_initial_query(self):
-        # Determine shopping target persona first
-        shopping_target_persona = self.persona 
-        if random.random() < 0.4: 
-            possible_targets = [r for r in ["mother", "father", "child"] if r != self.persona]
-            if possible_targets:
-                shopping_target_persona = random.choice(possible_targets)
-
-        query_subject = "for myself"
-        if shopping_target_persona == "child": query_subject = "for my child"
-        elif shopping_target_persona == "father": query_subject = "for my father"
-        elif shopping_target_persona == "mother" and self.persona != "mother": query_subject = "for my mother"
-
-        # 90% chance to generate a query for an existing product if samples are available
-        if self.sample_products_from_kg and random.random() < 0.9:
-            product_data = random.choice(self.sample_products_from_kg)
-            item_type = product_data.get('base_class_name')
-            color = product_data.get('color')
-            brand = product_data.get('brand')
+        target_product = self._get_current_target_product()
+        if not target_product:
+            self.current_shopping_goal_summary = "something nice for myself"
+            query_idea = "I'm looking for something nice."
+        else:
+            query_parts = [self.revealed_details['category']]
+            if 'color' in self.revealed_details: query_parts.insert(0, self.revealed_details['color'])
+            # Do not reveal brand in initial query to be more vague
+            # if 'brand' in self.revealed_details: query_parts.insert(0, self.revealed_details['brand'])
             
-            query_parts = []
-            # Make the query slightly less specific sometimes
-            if color and color != "Various" and random.random() < 0.8: query_parts.append(color)
-            if brand and random.random() < 0.6: query_parts.append(brand)
-            # Always include item type if from sample product
-            if item_type: query_parts.append(item_type)
-            else: # Fallback if item_type was somehow missing from sample
-                item_type = random.choice(self.kg_entities["item_categories"]) if self.kg_entities["item_categories"] else "something nice"
-                query_parts.append(item_type)
+            self.current_shopping_goal_summary = f"{' '.join(query_parts)} for {self.persona}"
             
-            self.current_shopping_goal_summary = f"{' '.join(query_parts)} {query_subject}"
-        else: # 10% chance for original random query (might not exist, or if no samples)
-            item_type = random.choice(self.kg_entities["item_categories"]) if self.kg_entities["item_categories"] else "something nice"
-            color = random.choice(self.kg_entities["colors"]) if self.kg_entities["colors"] else ""
-            brand = random.choice(self.kg_entities["brands"]) if self.kg_entities["brands"] and random.random() < 0.3 else "" 
-            
-            query_parts = []
-            if color: query_parts.append(color)
-            if brand: query_parts.append(brand)
-            query_parts.append(item_type)
-            self.current_shopping_goal_summary = f"{' '.join(query_parts)} {query_subject}"
+            # Make initial query more natural and vague
+            if 'color' in self.revealed_details and 'brand' in self.revealed_details:
+                query_idea = f"I'm looking for a {self.revealed_details['color']} {self.revealed_details['brand']} {self.revealed_details['category']}."
+            elif 'color' in self.revealed_details:
+                query_idea = f"I need a {self.revealed_details['color']} {self.revealed_details['category']}."
+            elif 'brand' in self.revealed_details:
+                 query_idea = f"I'm trying to find a {self.revealed_details['brand']} {self.revealed_details['category']}."
+            else: # Only category revealed
+                query_idea = f"I'm thinking about getting some {self.revealed_details['category']}."
+                if random.random() < 0.3: query_idea = f"Can you help me find {self.revealed_details['category']}?"
+                elif random.random() < 0.3: query_idea = f"Where can I look for {self.revealed_details['category']}?"
         
-        prompt = f"""You are impersonating a '{self.persona}' in a mall, talking to a robot assistant.
-Generate a natural, concise initial shopping query.
-You are thinking about: "{self.current_shopping_goal_summary}".
-Examples:
-- "I'm looking for a {random.choice(self.kg_entities.get("colors", ["blue"]))} {random.choice(self.kg_entities.get("item_categories", ["shirt"]))}."
-- "Can you help me find a {random.choice(self.kg_entities.get("item_categories", ["toy"]))} for the child?"
-- "Where can I find {random.choice(self.kg_entities.get("brands", ["GenericBrand"]))} shoes?"
-- "I need to buy {random.choice(self.kg_entities.get("item_categories", ["a gift"]))}."
+        prompt = f"""You are impersonating a '{self.persona}' who is starting to shop.
+You have a general idea: "{self.current_shopping_goal_summary}".
+Formulate a natural, slightly vague initial shopping query based on this idea. Don't reveal all details if your idea is specific.
+Examples of how you might phrase your thought:
+- "I'm looking for some new clothes." (If thinking about a shirt)
+- "I need a new coat." (If thinking about a specific coat)
+- "Where are the shoe stores?" (If thinking about shoes)
 
 Your query (just the query, no preamble):"""
-        return self._call_groq_api_for_simulation(prompt, max_tokens=50)
+        return self._call_groq_api_for_simulation(prompt, max_tokens=30)
 
     def respond_to_clarify_shopping_target(self, robot_query_summary):
-        intended_target_role = self.persona 
-        if self.current_shopping_goal_summary: # Check the summary of the *current* query being clarified
-            csl = self.current_shopping_goal_summary.lower()
-            if "for my child" in csl or "for the child" in csl : intended_target_role = "child"
-            elif "for my father" in csl or "for dad" in csl: intended_target_role = "father"
-            elif "for my mother" in csl or "for mum" in csl: intended_target_role = "mother"
-            elif "for myself" in csl or "for me" in csl: intended_target_role = self.persona
-            # If current_shopping_goal_summary doesn't specify "for X", it implies it's for self.persona
-
-        response_options = {
-            "mother": [f"It's for Mother.", f"Mother.", f"For the mother."],
-            "father": [f"It's for Father.", f"Father.", f"For the father."],
-            "child":  [f"It's for the Child.", f"The Child.", f"For my child."]
-        }
-        
-        specific_response_idea = f"It's for {intended_target_role.capitalize()}." # Default idea
-        if intended_target_role in response_options:
-            specific_response_idea = random.choice(response_options[intended_target_role])
-
         prompt = f"""You are impersonating a '{self.persona}'. The robot asked who the request '{robot_query_summary}' is for.
-You internally know the request is intended for '{intended_target_role}'.
-Your goal is to respond naturally but clearly stating the role (Mother, Father, or Child) so the robot can parse it.
-You are thinking of saying something like: '{specific_response_idea}'.
-Examples of good, clear responses: "For Mother.", "It's for the child.", "Father."
+You intend it for yourself ({self.persona}).
+Respond naturally. Examples: "For me.", "It's for myself.", "This one's for me."
 
-Your response (just the response, ensure it's parsable by a system looking for 'mother', 'father', or 'child'):"""
-        return self._call_groq_api_for_simulation(prompt, max_tokens=20)
+Your response (just the response):"""
+        return self._call_groq_api_for_simulation(prompt, max_tokens=15)
 
-    def decide_to_visit_store(self, store_name_suggested, item_context_summary):
-        decision_prompt = "Yes, let's go." if random.random() < 0.9 else "No, let's try another option first."
+    def decide_to_visit_store(self, store_name_suggested, item_context_summary_from_robot):
+        target_product = self._get_current_target_product()
+        decision_reason = "general interest"
+        agree_prob = 0.6 
+
+        if store_name_suggested in self.favorite_stores_for_this_session:
+            agree_prob = 0.95
+            decision_reason = f"it's a favorite store ({store_name_suggested})"
+        elif target_product and item_context_summary_from_robot:
+            robot_suggestion_lower = item_context_summary_from_robot.lower()
+            # Check if robot's suggestion at least mentions the category user is targeting
+            matches_category = target_product['category'].lower() in robot_suggestion_lower
+            
+            # More specific check: if robot says it "found X matching items"
+            is_direct_match_suggestion = "matching item(s) at" in robot_suggestion_lower or \
+                                         ("found" in robot_suggestion_lower and " at " in robot_suggestion_lower)
+
+            if is_direct_match_suggestion and matches_category:
+                agree_prob = 0.98
+                decision_reason = "robot seems to have found items in the right category"
+            elif matches_category and ("potential place" in robot_suggestion_lower):
+                 agree_prob = 0.85
+                 decision_reason = "robot suggested a relevant category store"
+            elif matches_category : # Robot mentions category, but not strongly as a find
+                 agree_prob = 0.75
+                 decision_reason = "store might have the right category"
+
+
+        final_decision_is_yes = random.random() < agree_prob
+        decision_prompt = "Yes, let's go." if final_decision_is_yes else "No, I'm not feeling that one. Any other ideas?"
+        
+        current_target_display = target_product['category'] if target_product else 'something'
+        revealed_display = str(self.revealed_details)
+
+        print(f"BENCHMARKING_LLM_DECISION: Visiting {store_name_suggested}? Current Target: {current_target_display}. Revealed: {revealed_display}. Robot said: '{item_context_summary_from_robot}'. Reason: {decision_reason}. Agree Prob: {agree_prob:.2f}. Decision: {'Yes' if final_decision_is_yes else 'No'}")
+
         prompt = f"""You are impersonating a '{self.persona}'.
-You are looking for: '{item_context_summary}'.
-The robot suggested visiting '{store_name_suggested}' and asked 'Shall we go there?'.
-Respond with a short, natural confirmation or rejection like '{decision_prompt}'.
+You are generally looking for '{current_target_display}' and have possibly revealed: {revealed_display}.
+The robot suggested visiting '{store_name_suggested}' based on its understanding: '{item_context_summary_from_robot}'.
+You internally decided: '{decision_prompt}' because of '{decision_reason}'.
+Respond with your decision.
 
-Your response (just 'Yes/No' or a short phrase):"""
+Your response (short phrase reflecting your decision):"""
         return self._call_groq_api_for_simulation(prompt, max_tokens=15)
 
     def acknowledge_arrival_and_readiness(self):
-        self.last_item_found_at_store = False 
-        prompt = f"""You are impersonating a '{self.persona}'.
-The robot has 'navigated' to a store and said: "We've arrived at [Store Name]. Please look around. Let me know when you're ready."
-Respond naturally that you've finished looking or are ready to give feedback.
-Examples: "Okay, I'm ready.", "I've had a look.", "Finished, thanks."
+        self.last_item_found_at_store = False
+        responses = ["Okay, I'm ready.", "I've had a look.", "Finished looking.", "Ready when you are.", "Alright, done looking."]
+        prompt = f"""You are '{self.persona}'. The robot said it arrived and asked you to let it know when you are ready.
+You are now ready. Respond with a short, natural confirmation.
+Examples: "Okay, I'm ready.", "I've had a look.", "Finished."
 
-Your response (short and natural):"""
-        return self._call_groq_api_for_simulation(prompt, max_tokens=15)
+Your response:"""
+        return random.choice(responses) if not self.client else self._call_groq_api_for_simulation(prompt, max_tokens=10)
 
-    def provide_fulfillment_feedback(self, item_context_summary, store_name):
-        found_it = random.random() < 0.6 
-        self.last_item_found_at_store = found_it
+
+    def provide_fulfillment_feedback(self, item_context_summary_from_robot, store_name):
+        target_product = self._get_current_target_product()
+        found_it_for_real = False
+        reason_for_not_finding = "it just wasn't right."
+
+        if not target_product:
+            return self._call_groq_api_for_simulation("I wasn't looking for anything specific, but thanks.", max_tokens=20)
         
-        item_name_only = item_context_summary.split(' for ')[0] 
-        if " " in item_name_only and len(item_name_only.split(' ')) > 2 : 
-            item_name_only = " ".join(item_name_only.split(' ')[-2:]) 
-        elif " " in item_name_only:
-            item_name_only = item_name_only.split(' ')[-1] 
-
-
-        response_if_found = f"Yes, I found a great {item_name_only}!"
-        response_if_not_found = f"No, they didn't have the right {item_name_only}."
-        actual_response_idea = response_if_found if found_it else response_if_not_found
-
-        prompt = f"""You are impersonating a '{self.persona}'.
-You were looking for '{item_context_summary}' at '{store_name}'.
-The robot asked: "Regarding {item_context_summary}, did you find what you were looking for at {store_name}?"
-You internally decided: '{actual_response_idea}'.
-Respond naturally.
-
-Your response (short and natural):"""
-        return self._call_groq_api_for_simulation(prompt, max_tokens=30)
-
-    def provide_general_store_feedback(self, store_name):
-        positive_feedback = ["The staff were helpful.", "Good selection here.", "Nice store layout.", "I liked the prices."]
-        negative_feedback = ["It was a bit messy.", "Couldn't find staff easily.", "Selection was limited for what I wanted.", "A bit too crowded."]
+        # Simulate if the store had the *specific* item the user secretly wants
+        # This depends on whether the robot's general search led to a store that stocks it.
+        # For this simulation, let's assume if the category is right, there's a chance.
+        # The robot's `item_context_summary_from_robot` tells us what *it* thinks it found.
+        # The user compares this to their internal specific `target_product`.
         
-        if self.last_item_found_at_store and random.random() < 0.8: 
-            feedback_idea = random.choice(positive_feedback)
-        elif not self.last_item_found_at_store and random.random() < 0.7:
-            feedback_idea = random.choice(negative_feedback)
+        # A very simplified check: does the robot's summary contain the target product's actual name?
+        # This is a high bar. A more realistic check would be if the store *could* have the item.
+        # Let's make it probabilistic based on category match.
+        if target_product['category'].lower() in item_context_summary_from_robot.lower():
+            # If the robot is on the right track (category), check if the specific item is "found"
+            if random.random() < 0.6: # 60% chance user "finds" their specific hidden item
+                found_it_for_real = True
+                # Reveal more details now that it's "found"
+                self.revealed_details['color'] = target_product['color']
+                self.revealed_details['brand'] = target_product['brand']
+            else:
+                # Did not find the *specific* one, even if category was right. Reveal a new detail.
+                if target_product['color'] and target_product['color'] != "Various" and self.revealed_details.get('color') != target_product['color']:
+                    reason_for_not_finding = f"they didn't have it in {target_product['color']}."
+                    if random.random() < 0.7: self.revealed_details['color'] = target_product['color'] 
+                elif target_product['brand'] and self.revealed_details.get('brand') != target_product['brand']:
+                    reason_for_not_finding = f"I was hoping for the {target_product['brand']} brand."
+                    if random.random() < 0.7: self.revealed_details['brand'] = target_product['brand']
+                else:
+                    reason_for_not_finding = "the style wasn't what I wanted."
+        else: # Robot was off-track with category
+            reason_for_not_finding = f"they didn't seem to have the type of {target_product['category']} I was after."
+
+
+        self.last_item_found_at_store = found_it_for_real
+        if found_it_for_real:
+            target_product['found'] = True 
+            response_idea = f"Yes! I found the perfect {target_product['category']}! Exactly what I was looking for."
+            # To make it more natural, sometimes a simpler "Yes, found it!"
+            if random.random() < 0.5: response_idea = f"Yes, I found a great {target_product['category']}!"
         else:
-            feedback_idea = "No particular feedback right now."
+            response_idea = f"No, unfortunately. {reason_for_not_finding}"
+            if random.random() < 0.3: response_idea = f"Hmm, not quite. {reason_for_not_finding}"
 
-        prompt = f"""You are impersonating a '{self.persona}'.
-You just visited '{store_name}'. The robot asked for general feedback or to say 'no feedback'.
-You are thinking: '{feedback_idea}'.
+
+        print(f"BENCHMARKING_LLM_FULFILLMENT: Target: {target_product['category']} ('{target_product['product_name']}'). Revealed: {self.revealed_details}. Robot context: '{item_context_summary_from_robot}'. Found specific item: {found_it_for_real}. Response: '{response_idea}'")
+
+        prompt = f"""You are '{self.persona}'. You were secretly hoping to find something like '{target_product['product_name']}' (a {target_product['category']}).
+The robot helped you look based on its understanding: '{item_context_summary_from_robot}' at '{store_name}'.
+The robot asks: "...did you find what you were looking for...?"
+You internally decided: '{response_idea}'. (This reflects if you found your secret item).
 Respond naturally.
 
-Your response (short and natural, or 'no feedback'):"""
-        return self._call_groq_api_for_simulation(prompt, max_tokens=30)
-
-    def decide_next_action(self, original_request_summary, was_last_item_fulfilled, has_more_options_for_current):
-        action_choice = "stop"
-        new_query_text_for_llm = None
-
-        if was_last_item_fulfilled: 
-            if random.random() < 0.6: 
-                action_choice = "stop"
-            else: 
-                action_choice = "new_request"
-        else: 
-            if has_more_options_for_current and random.random() < 0.7: 
-                action_choice = "continue_current_request"
-            elif random.random() < 0.5: 
-                action_choice = "new_request"
-            else: 
-                action_choice = "stop"
-
-        if action_choice == "new_request":
-            # When starting a new request, try to pick an existing item 70% of the time if samples available
-            if self.sample_products_from_kg and random.random() < 0.7:
-                new_product_sample = random.choice(self.sample_products_from_kg)
-                new_item = new_product_sample.get('base_class_name', "something else")
-                # Could add color/brand to make it more specific, but simple item type is fine for "what next"
-            else: # Fallback to general category
-                new_item = random.choice(self.kg_entities["item_categories"]) if self.kg_entities["item_categories"] else "something else"
-            
-            new_query_text_for_llm = f"Okay, now I'm looking for a {new_item}."
-            self.current_shopping_goal_summary = new_item # Update goal for next potential clarification
-        
-        fulfillment_str = "was fulfilled" if was_last_item_fulfilled else "was not fulfilled"
-        options_str = "there are more options" if has_more_options_for_current else "no more options"
-
-        prompt = f"""You are impersonating a '{self.persona}'.
-Your previous request was for '{original_request_summary}', which {fulfillment_str}.
-For that previous request, {options_str}.
-The robot asked what you want to do next (e.g., other suggestions, new request, or stop).
-
-You have decided to: '{action_choice}'.
-If starting a new request, you're thinking: '{new_query_text_for_llm if new_query_text_for_llm else ""}'.
-
-Formulate a natural language response based on your decision.
-Examples:
-- (stop) "That's all for now, thanks."
-- (continue) "Yes, what other options do you have for {original_request_summary.split(' for ')[0]}?"
-- (new_request) "Okay, let's look for {random.choice(self.kg_entities.get("item_categories", ["a new item"]))} now."
-
-Your response (short and natural):"""
+Your response:"""
         return self._call_groq_api_for_simulation(prompt, max_tokens=40)
 
-    def respond_to_anything_else(self):
-        if random.random() < 0.1: 
-            # When starting a new request here, try to pick an existing item 70% of the time if samples available
-            if self.sample_products_from_kg and random.random() < 0.7:
-                new_product_sample = random.choice(self.sample_products_from_kg)
-                new_item = new_product_sample.get('base_class_name', "a small thing")
-            else: # Fallback to general category
-                new_item = random.choice(self.kg_entities["item_categories"]) if self.kg_entities["item_categories"] else "a small thing"
+    def provide_general_store_feedback(self, store_name):
+        target_product = self._get_current_target_product()
+        feedback_idea = "It was okay."
 
-            self.current_shopping_goal_summary = new_item # Update goal for next potential clarification
-            return f"Actually, yes, I also need {new_item}."
-        else:
+        if store_name in self.favorite_stores_for_this_session:
+            feedback_idea = random.choice(["I love this store!", "Great atmosphere here.", "Always a good experience at " + store_name])
+        elif self.last_item_found_at_store: 
+            feedback_idea = random.choice(["So glad I found what I wanted here!", "Excellent, they had it!", "The selection for what I needed was perfect."])
+        else: 
+            if target_product: 
+                 feedback_idea = random.choice([
+                    f"They didn't have the {target_product['category']} I was looking for, unfortunately.",
+                    "A bit disappointing for {target_product['category']}s.",
+                    "The staff weren't very helpful when I asked about the " + target_product['category'] +"." if random.random() < 0.5 else "Selection was limited."
+                ])
+            else: 
+                feedback_idea = random.choice(["Not very impressed.", "Could be better organized."])
+        
+        print(f"BENCHMARKING_LLM_STORE_FEEDBACK: Store: {store_name}. Fav?: {store_name in self.favorite_stores_for_this_session}. Item found here?: {self.last_item_found_at_store}. Feedback idea: '{feedback_idea}'")
+
+        prompt = f"""You are '{self.persona}'. You just visited '{store_name}'.
+The robot asked for general feedback. You are thinking: '{feedback_idea}'.
+Respond naturally.
+
+Your response:"""
+        return self._call_groq_api_for_simulation(prompt, max_tokens=30)
+
+    def _move_to_next_target_item_or_stop(self):
+        current_target = self._get_current_target_product()
+        if current_target and current_target['found']:
+            self.current_target_item_index += 1
+            if self.current_target_item_index < len(self.shopping_list):
+                self._prepare_revealed_details_for_current_target()
+                return "new_target_item" 
+            else:
+                return "all_items_found" 
+        return "current_item_not_yet_found_or_no_list"
+
+
+    def decide_next_action(self, original_request_summary_from_robot, was_last_item_fulfilled_by_robot, has_more_options_for_current_robot_request):
+        next_move_signal = self._move_to_next_target_item_or_stop()
+        
+        action_choice = "stop" 
+        instruction_for_llm = "You've decided to stop shopping for now."
+        example_response = "That's all for now, thanks."
+        current_target_display = self._get_current_target_product()['category'] if self._get_current_target_product() else 'item'
+
+
+        if next_move_signal == "new_target_item":
+            action_choice = "new_request" 
+            next_target_product = self._get_current_target_product() # This is now the NEW target
+            
+            query_parts = [self.revealed_details['category']] 
+            if 'color' in self.revealed_details: query_parts.insert(0, self.revealed_details['color'])
+            # Brand might be too specific for a "what next" vague query
+            
+            new_item_query_idea = f"Now I'm thinking about {' '.join(query_parts)}."
+            if random.random() < 0.5: new_item_query_idea = f"What about looking for {' '.join(query_parts)}?"
+            
+            instruction_for_llm = f"You found your previous item. Now you want to look for your next item: '{next_target_product['category'] if next_target_product else 'something else'}'. You'll say something like: '{new_item_query_idea}'"
+            example_response = new_item_query_idea
+            self.current_shopping_goal_summary = f"{' '.join(query_parts)} for {self.persona}"
+
+
+        elif next_move_signal == "all_items_found":
+            action_choice = "stop"
+            instruction_for_llm = "You've found everything on your shopping list!"
+            example_response = "That's everything I needed, thank you so much!"
+
+        else: # current_item_not_yet_found_or_no_list (or robot didn't fulfill current sub-request)
+            if has_more_options_for_current_robot_request and random.random() < 0.7: # More likely to continue if options
+                action_choice = "continue_current_request"
+                instruction_for_llm = f"You haven't found your '{current_target_display}' yet. The robot has more options for '{original_request_summary_from_robot}'. You'll ask to see them."
+                example_response = f"Okay, what other suggestions do you have for {original_request_summary_from_robot.split(' for ')[0]}?"
+            else:
+                action_choice = "stop" 
+                instruction_for_llm = f"You haven't found your '{current_target_display}' and there are no more/no good options for '{original_request_summary_from_robot}'. You'll stop this search for now."
+                example_response = "Alright, let's not worry about that one then."
+
+        print(f"BENCHMARKING_LLM_NEXT_ACTION: Prev robot request: '{original_request_summary_from_robot}'. Robot thinks fulfilled: {was_last_item_fulfilled_by_robot}. User truth (last store): {self.last_item_found_at_store}. Next move signal: {next_move_signal}. Chosen action: {action_choice}. Instruction: '{instruction_for_llm}'")
+
+        prompt = f"""You are '{self.persona}'.
+The robot's last search was for '{original_request_summary_from_robot}'.
+The robot thinks that search was '{'fulfilled' if was_last_item_fulfilled_by_robot else 'not fulfilled'}'.
+Internally, your decision is: {instruction_for_llm}
+
+Formulate a natural language response that clearly conveys ONLY this decision.
+Example if you decided similarly: "{example_response}"
+
+Your response:"""
+        return self._call_groq_api_for_simulation(prompt, max_tokens=40)
+
+
+    def respond_to_anything_else(self):
+        # This is called when a sub-dialog (like finding one item) concludes,
+        # or if the initial query processing completes without going into iterative visits.
+        # Check if we should move to the next item on the main shopping list.
+        
+        # Advance to next item ONLY if current one was marked found.
+        # If current not found, _move_to_next_target_item_or_stop will return "current_item_not_yet_found_or_no_list"
+        current_target = self._get_current_target_product()
+        if current_target and not current_target['found']:
+            # If current target item is not found, and user chose to stop looking for it in decide_next_action,
+            # then for "anything else", we should stop the whole session for this more focused benchmark.
+            # OR, we could allow pivoting to the next item on the list here if the user is "giving up" on current one.
+            # For now, let's make it simpler: if user stopped searching for current *unfound* item, they stop for the day.
+            print(f"BENCHMARKING_LLM_ANYTHING_ELSE: Current target '{current_target['category']}' was not found, and user stopped that search. Ending session.")
+            return "No, that's everything for today. Thank you!"
+
+        next_move_signal = self._move_to_next_target_item_or_stop() 
+
+        if next_move_signal == "new_target_item":
+            next_target_product = self._get_current_target_product()
+            
+            query_parts = [self.revealed_details['category']]
+            if 'color' in self.revealed_details: query_parts.insert(0, self.revealed_details['color'])
+            
+            new_item_query_idea = f"Actually, I was also thinking about {' '.join(query_parts)}."
+            if random.random() < 0.3: new_item_query_idea = f"Yes, I also need to look for {' '.join(query_parts)}."
+
+            self.current_shopping_goal_summary = f"{' '.join(query_parts)} for {self.persona}"
+            print(f"BENCHMARKING_LLM_ANYTHING_ELSE: Moving to next target: {next_target_product['category']}. Query idea: '{new_item_query_idea}'")
+            return new_item_query_idea
+        else: # all_items_found or decided to stop
+            print(f"BENCHMARKING_LLM_ANYTHING_ELSE: No more items or stopping. Signal: {next_move_signal}")
             return "No, that's everything. Thank you!"

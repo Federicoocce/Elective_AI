@@ -3,10 +3,6 @@ import time
 import random
 
 class SpeechInterface:
-    """
-    Mock interface for Speech-to-Text (STT) and Text-to-Speech (TTS).
-    Integrates with AutomatedBenchmarkingLLM for simulated user input.
-    """
     def __init__(self):
         self._scripted_inputs = []
         self._current_input_idx = 0
@@ -27,7 +23,7 @@ class SpeechInterface:
                 brands=knowledge_base_entities.get("brands", []),
                 colors=knowledge_base_entities.get("colors", []),
                 store_names=knowledge_base_entities.get("store_names", []),
-                sample_products=knowledge_base_entities.get("sample_products", []) # Pass sample_products
+                sample_products=knowledge_base_entities.get("sample_products", []) 
             )
             print("SPEECH: Automated LLM User has been set and configured.")
         else:
@@ -44,9 +40,9 @@ class SpeechInterface:
 
     def listen_and_get_text(self, dialogue_state_hint=None, context_for_auto_llm=None):
         if self.automated_llm_user:
-            time.sleep(random.uniform(0.3, 0.8)) 
+            time.sleep(random.uniform(0.2, 0.5)) 
             
-            print(f"SPEECH: AutoLLMUser turn. Robot last said: \"{self.last_robot_utterance_for_auto_user}\". Hint: {dialogue_state_hint}")
+            print(f"SPEECH: AutoLLMUser turn. Robot last said: \"{self.last_robot_utterance_for_auto_user}\". Hint: {dialogue_state_hint}, Context: {context_for_auto_llm}")
             user_response = "I am not sure how to respond to that." 
 
             if dialogue_state_hint == "initial_speaker_id":
@@ -60,13 +56,13 @@ class SpeechInterface:
             elif dialogue_state_hint == "confirm_visit_store" and context_for_auto_llm:
                 user_response = self.automated_llm_user.decide_to_visit_store(
                     store_name_suggested=context_for_auto_llm.get("store_name", "that store"),
-                    item_context_summary=context_for_auto_llm.get("item_summary", "your item")
+                    item_context_summary_from_robot=context_for_auto_llm.get("item_summary", "your item") 
                 )
             elif dialogue_state_hint == "acknowledge_arrival_readiness":
                 user_response = self.automated_llm_user.acknowledge_arrival_and_readiness()
             elif dialogue_state_hint == "provide_fulfillment_feedback" and context_for_auto_llm:
                 user_response = self.automated_llm_user.provide_fulfillment_feedback(
-                    item_context_summary=context_for_auto_llm.get("item_summary", "the item"),
+                    item_context_summary_from_robot=context_for_auto_llm.get("item_summary", "the item"), # Corrected parameter name
                     store_name=context_for_auto_llm.get("store_name", "this store")
                 )
             elif dialogue_state_hint == "provide_general_store_feedback" and context_for_auto_llm:
@@ -75,20 +71,19 @@ class SpeechInterface:
                 )
             elif dialogue_state_hint == "decide_next_action" and context_for_auto_llm:
                 user_response = self.automated_llm_user.decide_next_action(
-                    original_request_summary=context_for_auto_llm.get("original_request_summary", "your previous request"),
-                    was_last_item_fulfilled=context_for_auto_llm.get("was_last_item_fulfilled", False),
-                    has_more_options_for_current=context_for_auto_llm.get("has_more_options", False)
+                    original_request_summary_from_robot=context_for_auto_llm.get("original_request_summary", "your previous request"), # Parameter name changed for clarity
+                    was_last_item_fulfilled_by_robot=context_for_auto_llm.get("was_last_item_fulfilled", False),  # Parameter name changed for clarity
+                    has_more_options_for_current_robot_request=context_for_auto_llm.get("has_more_options", False) # Parameter name changed for clarity
                 )
             elif dialogue_state_hint == "respond_to_anything_else":
                 user_response = self.automated_llm_user.respond_to_anything_else()
             elif dialogue_state_hint == "general_clarification": 
-                user_response = self.automated_llm_user._call_groq_api_for_simulation( # Let LLM generate a generic clarification
+                user_response = self.automated_llm_user._call_groq_api_for_simulation( 
                     f"You are impersonating a '{self.automated_llm_user.persona}'. The robot said something you didn't fully understand or needs rephrasing. Respond naturally asking for clarification or rephrasing.", max_tokens=20
-                ) if self.automated_llm_user.client else "Could you rephrase that please?" # Mock if no client
+                ) if self.automated_llm_user.client else "Could you rephrase that please?" 
             
             elif dialogue_state_hint is None or dialogue_state_hint == "general_input":
                  print(f"SPEECH_WARN: AutoLLMUser active but no specific hint ('{dialogue_state_hint}') matched. Using default response.")
-
 
             print(f" AUTO USER SAYS (LLM Mock): {user_response}")
             return user_response
@@ -104,13 +99,14 @@ class SpeechInterface:
                 return user_response
             except EOFError:
                  print("SPEECH: EOFError on input, returning 'stop'.")
-                 return "stop" # Return "stop" to allow graceful termination
+                 return "stop" 
             except KeyboardInterrupt:
                  print("SPEECH: KeyboardInterrupt during manual input, returning 'stop'.")
-                 return "stop" # Return "stop"
-
+                 return "stop" 
 
     def shutdown(self):
         print("SPEECH: SpeechInterface shutdown (Mock Mode).")
 
-# (rest of the file if __name__ == '__main__' block)
+if __name__ == '__main__':
+    print("--- Testing SpeechInterface ---")
+    # ... (rest of __main__ block if any)
