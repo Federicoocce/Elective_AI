@@ -23,7 +23,9 @@ class SpeechInterface:
                 brands=knowledge_base_entities.get("brands", []),
                 colors=knowledge_base_entities.get("colors", []),
                 store_names=knowledge_base_entities.get("store_names", []),
-                sample_products=knowledge_base_entities.get("sample_products", []) 
+                sample_products=knowledge_base_entities.get("sample_products", []),
+                global_favorite_stores=knowledge_base_entities.get("global_favorite_stores"), # Pass through
+                current_iteration_num=knowledge_base_entities.get("current_iteration_num")   # Pass through
             )
             print("SPEECH: Automated LLM User has been set and configured.")
         else:
@@ -62,8 +64,8 @@ class SpeechInterface:
                 user_response = self.automated_llm_user.acknowledge_arrival_and_readiness()
             elif dialogue_state_hint == "provide_fulfillment_feedback" and context_for_auto_llm:
                 user_response = self.automated_llm_user.provide_fulfillment_feedback(
-                    item_context_summary_from_robot=context_for_auto_llm.get("item_summary", "the item"), # Corrected parameter name
-                    store_name=context_for_auto_llm.get("store_name", "this store")
+                    item_context_summary_from_robot=context_for_auto_llm.get("item_summary", "the item"),
+                    store_name=context_for_auto_llm.get("store_name", "this store") # Use the parameter name defined in the method
                 )
             elif dialogue_state_hint == "provide_general_store_feedback" and context_for_auto_llm:
                 user_response = self.automated_llm_user.provide_general_store_feedback(
@@ -71,9 +73,9 @@ class SpeechInterface:
                 )
             elif dialogue_state_hint == "decide_next_action" and context_for_auto_llm:
                 user_response = self.automated_llm_user.decide_next_action(
-                    original_request_summary_from_robot=context_for_auto_llm.get("original_request_summary", "your previous request"), # Parameter name changed for clarity
-                    was_last_item_fulfilled_by_robot=context_for_auto_llm.get("was_last_item_fulfilled", False),  # Parameter name changed for clarity
-                    has_more_options_for_current_robot_request=context_for_auto_llm.get("has_more_options", False) # Parameter name changed for clarity
+                    original_request_summary_from_robot=context_for_auto_llm.get("original_request_summary", "your previous request"),
+                    was_last_item_fulfilled_by_robot=context_for_auto_llm.get("was_last_item_fulfilled", False),
+                    has_more_options_for_current_robot_request=context_for_auto_llm.get("has_more_options", False)
                 )
             elif dialogue_state_hint == "respond_to_anything_else":
                 user_response = self.automated_llm_user.respond_to_anything_else()
@@ -83,7 +85,9 @@ class SpeechInterface:
                 ) if self.automated_llm_user.client else "Could you rephrase that please?" 
             
             elif dialogue_state_hint is None or dialogue_state_hint == "general_input":
+                 # interaction_count is handled by _call_groq_api_for_simulation or manually in non-LLM branches
                  print(f"SPEECH_WARN: AutoLLMUser active but no specific hint ('{dialogue_state_hint}') matched. Using default response.")
+
 
             print(f" AUTO USER SAYS (LLM Mock): {user_response}")
             return user_response
