@@ -15,19 +15,26 @@
       "Urban Stylez": {
         "last_visit_fulfilled": false,
         "rating": 2,
-        "notes_positive": [],
+        "notes_positive": [
+          "great experience",
+          "found the Teal Floral",
+          "found what I was looking for"
+        ],
         "notes_negative": [
-          "selection for shirts wasn't quite what I was looking for"
+          "selection for shirts wasn't quite what I was looking for",
+          "selection for shirts wasn't quite right for me",
+          "Selection could be better"
         ]
       },
       "Outerwear Essentials": {
         "last_visit_fulfilled": false,
-        "rating": 3,
+        "rating": 2,
         "notes_positive": [
           "good selection"
         ],
         "notes_negative": [
-          "selection for shirts wasn't quite what I was expecting"
+          "selection for shirts wasn't quite what I was expecting",
+          "didn't have it in stock"
         ]
       },
       "Everyday Apparel": {
@@ -44,9 +51,24 @@
         "rating": 5,
         "notes_positive": [
           "good selection of Sandal",
-          "good service"
+          "good service",
+          "ambiance",
+          "service",
+          "good selection",
+          "great selection of dresses"
         ],
         "notes_negative": []
+      },
+      "Kids Playworld": {
+        "last_visit_fulfilled": false,
+        "rating": 2,
+        "notes_positive": [
+          "fun activities",
+          "play areas"
+        ],
+        "notes_negative": [
+          "Selection wasn't great."
+        ]
       }
     },
     "item_feedback": {
@@ -61,14 +83,43 @@
         "likes": [],
         "dislikes": [
           "selection wasn't quite what I was expecting",
-          "selection wasn't quite right"
+          "selection wasn't quite right",
+          "selection"
         ]
       },
       "Sandal": {
         "likes": [
           "Beige Strappy Heeled",
-          "Heeled"
+          "Heeled",
+          "Purple",
+          "Flip-Flop"
         ],
+        "dislikes": []
+      },
+      "Coat": {
+        "likes": [],
+        "dislikes": [
+          "didn't have it in stock",
+          "Selection"
+        ]
+      },
+      "Toy": {
+        "likes": [
+          "fun activities"
+        ],
+        "dislikes": [
+          "Selection"
+        ]
+      },
+      "Dress": {
+        "likes": [
+          "Teal Floral",
+          "Red Floral Maxi Dress"
+        ],
+        "dislikes": []
+      },
+      "Trouser": {
+        "likes": [],
         "dislikes": []
       }
     }
@@ -105,16 +156,19 @@
       },
       "Urban Stylez": {
         "last_visit_fulfilled": true,
-        "rating": 5,
+        "rating": 3,
         "notes_positive": [
           "found a great item",
           "good selection of Pink Crisp Cotton Shirt",
           "ambiance",
           "service",
-          "good selection of Bag"
+          "good selection of Bag",
+          "variety of products",
+          "good selection"
         ],
         "notes_negative": [
-          "didn't have the specific Pullover I was looking for"
+          "didn't have the specific Pullover I was looking for",
+          "didn't have the specific Dress I was looking for"
         ]
       },
       "Chic Boutique": {
@@ -187,6 +241,12 @@
         "dislikes": [
           "couldn't find the specific one I was looking for"
         ]
+      },
+      "Dress": {
+        "likes": [],
+        "dislikes": [
+          "specific Dress I was looking for"
+        ]
       }
     }
   },
@@ -197,18 +257,54 @@
     "shop_reviews": {
       "Classic Comfort": {
         "last_visit_fulfilled": false,
-        "rating": 2,
+        "rating": 3,
         "notes_positive": [],
         "notes_negative": [
-          "selection for coats wasn't quite right for me"
+          "selection for coats wasn't quite right for me",
+          "couldn't find the Grey Hooded Sweatshirt"
         ]
       },
       "Urban Stylez": {
         "last_visit_fulfilled": false,
         "rating": 2,
+        "notes_positive": [
+          "ambiance",
+          "service"
+        ],
+        "notes_negative": [
+          "couldn't find the Blue Strappy Heeled Sandal",
+          "couldn't find the specific shirt I was looking for"
+        ]
+      },
+      "Kids Playworld": {
+        "last_visit_fulfilled": false,
+        "rating": 2,
+        "notes_positive": [
+          "like coming to Kids Playworld",
+          "selection for Pullover"
+        ],
+        "notes_negative": [
+          "didn't find the Grey Hooded Sweatshirt",
+          "didn't have the item I wanted"
+        ]
+      },
+      "Chic Boutique": {
+        "last_visit_fulfilled": true,
+        "rating": 3,
+        "notes_positive": [
+          "I love coming to Chic Boutique, it's one",
+          "found what I was looking for"
+        ],
+        "notes_negative": [
+          "didn't have it"
+        ]
+      },
+      "Footwear Palace": {
+        "last_visit_fulfilled": false,
+        "rating": 2,
         "notes_positive": [],
         "notes_negative": [
-          "couldn't find the Blue Strappy Heeled Sandal"
+          "selection for shirts wasn't quite right for me"
         ]
       }
     },
@@ -223,6 +319,24 @@
         "likes": [],
         "dislikes": [
           "couldn't find the Blue Strappy Heeled Sandal"
+        ]
+      },
+      "Pullover": {
+        "likes": [],
+        "dislikes": [
+          "couldn't find the Grey Hooded Sweatshirt"
+        ]
+      },
+      "T-shirt/top": {
+        "likes": [],
+        "dislikes": []
+      },
+      "Shirt": {
+        "likes": [],
+        "dislikes": [
+          "Purple Crisp Cotton",
+          "couldn't find the specific shirt I was looking for",
+          "selection wasn't quite right"
         ]
       }
     }
