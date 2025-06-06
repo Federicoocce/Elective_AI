@@ -17,24 +17,7 @@
     "favorite_colors": [],
     "favorite_brands": [],
     "preferred_categories": [],
-    "shop_reviews": {
-      "Kids Playworld": {
-        "last_visit_fulfilled": true,
-        "rating": 5,
-        "notes_positive": [
-          "great ambiance",
-          "good selection of Toy"
-        ],
-        "notes_negative": []
-      }
-    },
-    "item_feedback": {
-      "Toy": {
-        "likes": [
-          "great"
-        ],
-        "dislikes": []
-      }
-    }
+    "shop_reviews": {},
+    "item_feedback": {}
   }
 }
