@@ -14,16 +14,17 @@ from nav2_msgs.action import NavigateToPose
 from geometry_msgs.msg import PoseStamped, Point, Quaternion as RosQuaternion
 from action_msgs.msg import GoalStatus
 from tf2_ros import TransformException
+from tf2_ros import LookupException, ConnectivityException, ExtrapolationException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 
 
 # --- Import Application Modules ---
-from llm_groq_parser import GroqQueryParser
-from speech_interface import SpeechInterface
-from user_manager import UserProfileManager, VALID_USER_KEYS
-from mall_query_engine import KnowledgeGraphService
-from recommendation_engine import RecommenderEngine
+from .llm_groq_parser import GroqQueryParser
+from .speech_interface import SpeechInterface
+from .user_manager import UserProfileManager, VALID_USER_KEYS
+from .mall_query_engine import KnowledgeGraphService
+from .recommendation_engine import RecommenderEngine
 
 # --- Global State (outside class for script compatibility) ---
 current_speaker_role = None 
@@ -132,30 +133,28 @@ class MainRobotControllerNode(Node):
             return False
 
     def get_current_robot_pose(self):
-        """
-        Returns the current robot pose as (x, y, theta_radians) in the 'map' frame.
-        Returns (None, None, None) on error.
-        """
-        if not (self.tf_buffer and self.tf_listener):
-            self.get_logger().warn("TF buffer or listener not available for getting current pose.")
-            return None, None, None
-        try:
-            transform_stamped = self.tf_buffer.lookup_transform(
-                'map', 'base_link', rclpy.time.Time()
-            )
-            x = transform_stamped.transform.translation.x
-            y = transform_stamped.transform.translation.y
-            q = transform_stamped.transform.rotation
-            yaw_radians = math.atan2(2.0 * (q.w * q.z + q.x * q.y),
-                                     1.0 - 2.0 * (q.y * q.y + q.z * q.z))
-            self.get_logger().debug(f"Current robot pose: x={x:.2f}, y={y:.2f}, yaw_deg={math.degrees(yaw_radians):.2f}")
-            return x, y, yaw_radians
-        except TransformException as ex:
-            self.get_logger().warn(f'Could not transform base_link to map: {ex}. Pose unavailable.')
-            return None, None, None
-        except Exception as e: # Catch any other unexpected errors
-            self.get_logger().error(f'Unexpected error getting current pose: {e}. Pose unavailable.')
-            return None, None, None
+        """Returns current robot pose as (x, y, theta_radians) with retries"""
+        for _ in range(5):  # Add retry mechanism
+            try:
+                # Wait for transform to become available
+                self.tf_buffer.can_transform('map', 'base_link', rclpy.time.Time(), timeout=rclpy.duration.Duration(seconds=1.0))
+                
+                transform_stamped = self.tf_buffer.lookup_transform(
+                    'map', 'base_link', rclpy.time.Time(seconds=0)  # Use latest available transform
+                )
+                x = transform_stamped.transform.translation.x
+                y = transform_stamped.transform.translation.y
+                q = transform_stamped.transform.rotation
+                yaw_radians = math.atan2(2.0 * (q.w * q.z + q.x * q.y),
+                                        1.0 - 2.0 * (q.y * q.y + q.z * q.z))
+                return x, y, yaw_radians
+                
+            except (TransformException, LookupException, ConnectivityException, ExtrapolationException) as ex:
+                self.get_logger().warn(f'TF unavailable, retrying: {ex}')
+                time.sleep(0.5)  # Brief delay between retries
+        
+        self.get_logger().error('Failed to get pose after 5 attempts')
+        return None, None, None
 
 
     def identify_role_from_text(self, text):
@@ -351,7 +350,9 @@ def main(args=None):
     except KeyboardInterrupt:
         main_controller_node.get_logger().info("KeyboardInterrupt, shutting down.")
     except Exception as e:
-        main_controller_node.get_logger().error(f"Unhandled exception in main: {e}", exc_info=True)
+        import traceback
+        error_msg = f"Unhandled exception in main: {e}\n{traceback.format_exc()}"
+        main_controller_node.get_logger().error(error_msg)
     finally:
         main_controller_node.get_logger().info("Shutting down MainRobotControllerNode.")
         # SpeechInterface shutdown might not be strictly necessary if it has no resources to release
